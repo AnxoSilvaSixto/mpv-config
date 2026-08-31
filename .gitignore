@@ -1,13 +1,17 @@
-# mpv portable config .gitignore
+# mpv portable config
 
-# Cache (auto-generated)
-portable_config/cache/
-
-# Binary files (re-download via updater)
+# Binaries (managed by updater.bat / installer/updater.ps1)
 mpv.exe
 mpv.com
 
-# OS generated files
+# Auto-generated cache (shader cache, watch_later)
+portable_config/cache/
+
+# Auto-generated logs/state (do not commit)
+portable_config/tools/update-log.txt
+portable_config/tools/update-state.json
+
+# OS generated
 .DS_Store
 .DS_Store?
 ._*
@@ -15,3 +19,4 @@ mpv.com
 .Trashes
 ehthumbs.db
 Thumbs.db
+Desktop.ini

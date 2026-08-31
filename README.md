@@ -1,118 +1,134 @@
 # mpv-config
 
-> Portable mpv player configuration with uosc UI, HDR shaders, and automation
+> Portable mpv player configuration with uosc UI, HDR shaders, and automation.
 
 [![GitHub](https://img.shields.io/badge/GitHub-AnxoSilvaSixto/mpv--config-181717?style=flat&logo=github)](https://github.com/AnxoSilvaSixto/mpv-config)
-[![mpv](https://img.shields.io/badge/mpv-latest-48AA42?style=flat&logo=video%20player&logoColor=white)](https://mpv.io)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![mpv](https://img.shields.io/badge/mpv-latest-48AA42?style=flat)](https://mpv.io)
 
-> **⚠️ Config-heavy** — This is a highly customized setup tuned for my specific hardware and preferences. Use as inspiration but expect to tweak settings for your own system.
+> **Note:** Highly customized setup tuned for specific hardware (RTX 5080, Vulkan, 1440p). Use as reference and adjust for your own system.
 
-## 🎬 Features
+## Features
 
-- **uosc** — Modern, gesture-based player interface
-- **HDR tone-mapping** — hdr-toys shader suite with 50+ transfer functions
-- **Auto-refresh rate** — Dynamic display refresh rate switching
-- **Thumbnail preview** — thumbfast script for timeline thumbnails
+- **uosc** — Modern, minimal player interface
+- **HDR tone-mapping** — hdr-toys shader suite (tone-mapping, gamut-mapping, transfer functions)
+- **Auto refresh rate** — Dynamic display refresh rate switching
+- **Thumbnail preview** — thumbfast timeline thumbnails
 - **Skip intro** — Automatic intro skipping
-- **Subtitle selection** — Multi-subtitle support with sub-select
-- **Auto-crop** — Automatic video cropping
-- **Auto-update** — Automatic mpv binary updates
+- **Subtitle selection** — sub-select menu
+- **Auto-crop / Auto-deinterlace** — autocrop, autodeint
 
-## 📁 Structure
+## Structure
 
 ```
-mpv-config/
+C:\mpv\
 ├── portable_config/
 │   ├── mpv.conf              # Main configuration
-│   ├── input.conf            # Keybindings
-│   ├── scripts/              # Lua scripts
-│   │   ├── uosc/             # uosc UI (main interface)
+│   ├── hdr-toys.conf         # HDR profiles (auto-managed, do not edit directly)
+│   ├── input.conf            # Keybindings (custom bindings only; defaults handled by uosc/mpv)
+│   ├── scripts/
+│   │   ├── uosc/             # uosc UI
 │   │   ├── media/            # thumbfast, skip_intro, sub-select
-│   │   ├── display/          # Refresh rate switching
+│   │   ├── display/          # change-refresh
 │   │   └── utilities/        # autocrop, autodeint
-│   ├── script-opts/          # Script configuration
-│   ├── shaders/              # GLSL shaders (Git LFS)
-│   │   ├── hdr-toys/         # HDR tone-mapping suite
-│   │   ├── ArtCNN_C4F32.glsl # AI upscaling
-│   │   ├── CfL_Prediction.glsl # Color prediction
-│   │   ├── nlmeans.glsl      # Noise reduction
-│   │   └── ravu-zoom-ar-r3.hook # Zoom shader
-│   ├── fonts/                # uosc custom fonts
+│   ├── script-opts/          # Script configs (uosc, thumbfast, sub-select, changerefresh)
+│   ├── shaders/
+│   │   ├── hdr-toys/         # HDR suite (~77 files, ~300 KB, plain text)
+│   │   ├── ArtCNN_C4F32.glsl # AI upscaling (Git LFS)
+│   │   ├── CfL_Prediction.glsl # Chroma reconstruction (Git LFS)
+│   │   ├── nlmeans.glsl      # Denoising (Git LFS)
+│   │   └── ravu-zoom-ar-r3.hook # Upscaling (Git LFS)
+│   ├── fonts/                # uosc fonts
 │   └── tools/                # Auto-update scripts
-├── doc/                      # Documentation
-├── installer/                # Updater scripts
-├── settings.xml              # Portable settings
-└── updater.bat               # Auto-updater
+├── doc/                      # mpv manual
+├── installer/
+│   └── updater.ps1           # PowerShell updater logic
+├── mpv/                      # mpv system files (fonts.conf)
+├── updater.bat               # Entry point for updates
+├── mpv-register.bat          # System integration (register)
+├── mpv-unregister.bat        # System integration (unregister)
+└── settings.xml              # Portable settings
 ```
 
-## 🎮 Keybindings
+## Shaders
 
-| Key | Action |
-|-----|--------|
-| `Mouse Right` | Seek backward 10s |
-| `Mouse Left` | Seek forward 10s |
-| `Mouse Middle` | Toggle pause |
-| `Scroll Up/Down` | Volume up/down |
-| `Shift+Scroll` | Audio delay |
-| `j` | Cycle sub tracks |
-| `k` | Cycle audio tracks |
-| `l` | Cycle video tracks |
-| `f` | Toggle fullscreen |
-| `q` | Quit player |
+Large binary-adjacent shaders are tracked via **Git LFS** (`portable_config/shaders/*.glsl`, `*.hook` at top level):
 
-## 🎨 Shaders (Git LFS)
+| Shader | Purpose | Storage |
+|--------|---------|---------|
+| `hdr-toys/` | HDR tone-mapping, gamut-mapping, transfer functions | Plain text (~300 KB) |
+| `ArtCNN_C4F32` | AI upscaling | Git LFS (~761 KB) |
+| `CfL_Prediction` | Chroma-from-luma prediction | Git LFS |
+| `nlmeans` | Non-local means denoising | Git LFS |
+| `ravu-zoom-ar-r3` | Adaptive upscaling | Git LFS |
 
-Shader files are tracked via **Git LFS** to keep repository size manageable.
+> hdr-toys files are small text and stored directly in git. Only the four top-level shaders use LFS.
 
-| Shader | Purpose |
-|--------|---------|
-| **hdr-toys/** | HDR tone-mapping (Reinhard, Linear, BT.2446, etc.) |
-| **ArtCNN_C4F32** | AI-powered upscaling |
-| **CfL_Prediction** | Color space prediction |
-| **nlmeans** | Non-local means denoising |
-| **ravu-zoom-ar** | Adaptive resolution zoom |
+## Scripts & Tools
 
-## 📜 Scripts & Tools
+| Script | Description | Source |
+|--------|-------------|--------|
+| **uosc** | Modern UI with timeline, controls, menus | [tomasklaen/uosc](https://github.com/tomasklaen/uosc) |
+| **thumbfast** | Thumbnail preview | [po5/thumbfast](https://github.com/po5/thumbfast) |
+| **skip_intro** | Intro skipping | [Chinna95P/mpv-anime-build](https://github.com/Chinna95P/mpv-anime-build/blob/main/scripts/skip_intro.lua) |
+| **sub-select** | Subtitle selection | [CogentRedTester/mpv-sub-select](https://github.com/CogentRedTester/mpv-sub-select) |
+| **display/change-refresh** | Refresh rate switching | Custom |
+| **utilities/autocrop** | Auto cropping | [kevmitch/mpv-autocrop](https://github.com/kevmitch/mpv-autocrop) |
+| **utilities/autodeint** | Auto deinterlacing | [mpv-player/mpv](https://github.com/mpv-player/mpv) |
+| **hdr-toys** | HDR shader suite | [natural-harmonia-gropius/hdr-toys](https://github.com/natural-harmonia-gropius/hdr-toys) |
+| **ArtCNN** | Upscaling | [Artoriuz/ArtCNN](https://github.com/Artoriuz/ArtCNN) |
+| **ravu** | Zoom prescaler | [bjin/mpv-prescalers](https://github.com/bjin/mpv-prescalers) |
+| **nlmeans** | Denoising | [AN3223/dotfiles](https://github.com/AN3223/dotfiles) |
 
-| Script | Description | Link |
-|--------|-------------|------|
-| **uosc** | Modern UI with menus, timeline, controls | [GitHub](https://github.com/tomasklaen/uosc) |
-| **thumbfast** | Fast thumbnail preview generation | [GitHub](https://github.com/po5/thumbfast) |
-| **skip_intro** | Automatic intro sequence skipping | [GitHub](https://github.com/Chinna95P/mpv-anime-build/blob/main/scripts/skip_intro.lua) |
-| **sub-select** | Subtitle track selection menu | [GitHub](https://github.com/CogentRedTester/mpv-sub-select) |
-| **display/change-refresh** | Dynamic refresh rate switching | *(custom)* |
-| **utilities/autocrop** | Automatic video cropping | [GitHub](https://github.com/kevmitch/mpv-autocrop) |
-| **utilities/autodeint** | Auto deinterlacing | [GitHub](https://github.com/mpv-player/mpv) |
-| **hdr-toys** | HDR tone-mapping shader suite | [GitHub](https://github.com/natural-harmonia-gropius/hdr-toys) |
-| **ravu** | Adaptive resolution zoom | [GitHub](https://github.com/bjin/mpv-prescalers) |
-| **ArtCNN** | AI-powered upscaling | [GitHub](https://github.com/Artoriuz/ArtCNN) |
-| **nlmeans** | Non-local means denoising | [GitHub](https://github.com/AN3223/dotfiles) |
+## Keybindings
 
-## 🔄 Auto-Update
+Custom bindings defined in `portable_config/input.conf`. General playback, seeking, and volume are handled by uosc/mpv defaults.
+
+| Key | Action | Menu |
+|-----|--------|------|
+| `MBTN_RIGHT` / `MENU` | Open uosc menu | — |
+| `Ctrl+Shift+s` | Screenshot raw source frame | Diagnostics > Screenshot (raw source frame) |
+| `Alt+d` | Toggle native deband (yes/no) | Diagnostics > Deband toggle |
+| `Alt+g` | Apply classicjazz deband tuning (2:35:16:4) | — |
+| `Alt+n` | Enable nlmeans denoise (prepend) | Diagnostics > Denoise > On |
+| `Alt+Shift+n` | Disable nlmeans | Diagnostics > Denoise > Off |
+| `Alt+h` | Disable hdr-toys, restore native tone-mapping | Diagnostics > HDR (use native tone-mapping) |
+| `Alt+t` | Cycle tone-mapping `spline` / `bt.2446a` | — |
+
+## Auto-Update
 
 ```batch
-updater.bat          # Update mpv binaries
-tools/Register-MpvAutoupdate.ps1  # Register auto-updater
+updater.bat                                      # Update mpv binaries (entry point)
+installer/updater.ps1                            # PowerShell update logic
+portable_config/tools/Register-MpvAutoupdate.ps1 # Register scheduled auto-update
+portable_config/tools/Update-MpvEnvironment.ps1  # Sync hdr-toys.conf and environment
 ```
 
-## 🛠️ Installation
+`hdr-toys.conf` is auto-managed by `Update-MpvEnvironment.ps1` — edit `mpv.conf` profiles instead.
 
-1. Download latest mpv portable from https://mpv.io
-2. Extract to `C:\mpv`
-3. Clone this repo: `git clone https://github.com/AnxoSilvaSixto/mpv-config.git C:\mpv`
-4. Run `updater.bat` to get latest binaries
-5. Launch `mpv.com`
+## Installation
 
-## 📚 Documentation
+1. Download portable mpv from https://mpv.io and extract to `C:\mpv`
+2. Back up existing `portable_config` if needed
+3. Clone this repo:
+   ```powershell
+   git clone https://github.com/AnxoSilvaSixto/mpv-config.git C:\mpv-temp
+   Copy-Item -Path C:\mpv-temp\portable_config -Destination C:\mpv\portable_config -Recurse -Force
+   Copy-Item -Path C:\mpv-temp\installer, C:\mpv-temp\doc, C:\mpv-temp\*.bat, C:\mpv-temp\*.xml -Destination C:\mpv\ -Recurse -Force
+   ```
+   Or copy `portable_config/` directly over your existing `C:\mpv\portable_config\`
+4. Ensure Git LFS is installed: `git lfs install`
+5. Run `updater.bat` to fetch latest mpv binaries
+6. Launch `mpv.com` (or `mpv.exe`)
 
-- `AGENTS.md` — Project guidelines and rules
+> `mpv.exe` / `mpv.com` are ignored in git and managed by the updater.
+
+## Documentation
+
+- `AGENTS.md` — Repository guidelines
 - `doc/manual.pdf` — mpv manual
+- `portable_config/mpv.conf` — Main video/audio/output settings
+- `portable_config/input.conf` — Keybindings
 
-## 📄 License
+## License
 
-This project is licensed under the MIT License.
-
----
-
-*Last updated: 2026-08-31*
+MIT — see upstream script/shader licenses for bundled third-party code.
