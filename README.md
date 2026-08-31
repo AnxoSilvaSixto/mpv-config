@@ -79,7 +79,7 @@ Shader files are tracked via **Git LFS** to keep repository size manageable.
 |--------|-------------|------|
 | **uosc** | Modern UI with menus, timeline, controls | [GitHub](https://github.com/tomasklaen/uosc) |
 | **thumbfast** | Fast thumbnail preview generation | [GitHub](https://github.com/po5/thumbfast) |
-| **skip_intro** | Automatic intro sequence skipping | [GitHub](https://github.com/Chinna95P/mpv-anime-build) |
+| **skip_intro** | Automatic intro sequence skipping | [GitHub](https://github.com/Chinna95P/mpv-anime-build/blob/main/scripts/skip_intro.lua) |
 | **sub-select** | Subtitle track selection menu | [GitHub](https://github.com/CogentRedTester/mpv-sub-select) |
 | **display/change-refresh** | Dynamic refresh rate switching | *(custom)* |
 | **utilities/autocrop** | Automatic video cropping | [GitHub](https://github.com/kevmitch/mpv-autocrop) |
