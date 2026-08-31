@@ -6,6 +6,8 @@
 [![mpv](https://img.shields.io/badge/mpv-latest-48AA42?style=flat&logo=video%20player&logoColor=white)](https://mpv.io)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+> **⚠️ Config-heavy** — This is a highly customized setup tuned for my specific hardware and preferences. Use as inspiration but expect to tweak settings for your own system.
+
 ## 🎬 Features
 
 - **uosc** — Modern, gesture-based player interface
@@ -102,6 +104,11 @@ tools/Register-MpvAutoupdate.ps1  # Register auto-updater
 
 - `AGENTS.md` — Project guidelines and rules
 - `doc/manual.pdf` — mpv manual
+
+## 🔗 Related Projects
+
+- **[AniVault](https://github.com/AnxoSilvaSixto/AniVault)** — Anime collection tracker & reference database
+- **[OpenCode](https://opencode.ai)** — AI coding agent for terminal
 
 ## 📄 License
 
