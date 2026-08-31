@@ -73,17 +73,21 @@ Shader files are tracked via **Git LFS** to keep repository size manageable.
 | **nlmeans** | Non-local means denoising |
 | **ravu-zoom-ar** | Adaptive resolution zoom |
 
-## 📜 Scripts
+## 📜 Scripts & Tools
 
-| Script | Description |
-|--------|-------------|
-| **uosc** | Modern UI with menus, timeline, controls |
-| **thumbfast** | Fast thumbnail preview generation |
-| **skip_intro** | Automatic intro sequence skipping |
-| **sub-select** | Subtitle track selection menu |
-| **display/change-refresh** | Dynamic refresh rate switching |
-| **utilities/autocrop** | Automatic video cropping |
-| **utilities/autodeint** | Auto deinterlacing |
+| Script | Description | Link |
+|--------|-------------|------|
+| **uosc** | Modern UI with menus, timeline, controls | [GitHub](https://github.com/fs932/uosc) |
+| **thumbfast** | Fast thumbnail preview generation | [GitHub](https://github.com/pigigaldo/thumbfast) |
+| **skip_intro** | Automatic intro sequence skipping | [GitHub](https://github.com/Eddow/skip-intro-mark) |
+| **sub-select** | Subtitle track selection menu | [GitHub](https://github.com/tomasklaen/sub-select) |
+| **display/change-refresh** | Dynamic refresh rate switching | [GitHub](https://github.com/Chasiou/display-change-refresh) |
+| **utilities/autocrop** | Automatic video cropping | [GitHub](https://github.com/joeygonz/better-autocrop) |
+| **utilities/autodeint** | Auto deinterlacing | [GitHub](https://github.com/rofl0r/mpv-scripts) |
+| **hdr-toys** | HDR tone-mapping shader suite | [GitHub](https://github.com/hwcr/hdr-toys) |
+| **ravu** | Adaptive resolution zoom | [GitHub](https://github.com/HdrEyes/ravu) |
+| **ArtCNN** | AI-powered upscaling | [GitHub](https://github.com/nihui/artcnn) |
+| **nlmeans** | Non-local means denoising | [GitHub](https://github.com/nihui/nlmeans-gpu) |
 
 ## 🔄 Auto-Update
 
@@ -104,11 +108,6 @@ tools/Register-MpvAutoupdate.ps1  # Register auto-updater
 
 - `AGENTS.md` — Project guidelines and rules
 - `doc/manual.pdf` — mpv manual
-
-## 🔗 Related Projects
-
-- **[AniVault](https://github.com/AnxoSilvaSixto/AniVault)** — Anime collection tracker & reference database
-- **[OpenCode](https://opencode.ai)** — AI coding agent for terminal
 
 ## 📄 License
 
