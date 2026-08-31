@@ -1,7 +1,8 @@
 -- skip_intro.lua v2.2 (Performance Fix - Cached Chapters)
 -- Detects OP/ED/PV/Intro-type chapters by title pattern and shows a clickable
 -- "SKIP <label>" button (or press Enter) to jump to the next chapter.
--- Source: Chinna95P/mpv-anime-build (scripts/skip_intro.lua)
+-- Source: https://github.com/Chinna95P/mpv-anime-build/blob/main/scripts/skip_intro.lua
+-- Thanks to Chinna95P
 
 local opts = {
     enabled = true,

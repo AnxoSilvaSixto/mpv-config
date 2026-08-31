@@ -87,7 +87,7 @@ Shader files are tracked via **Git LFS** to keep repository size manageable.
 | **hdr-toys** | HDR tone-mapping shader suite | [GitHub](https://github.com/natural-harmonia-gropius/hdr-toys) |
 | **ravu** | Adaptive resolution zoom | [GitHub](https://github.com/bjin/mpv-prescalers) |
 | **ArtCNN** | AI-powered upscaling | [GitHub](https://github.com/Artoriuz/ArtCNN) |
-| **nlmeans** | Non-local means denoising | [GitHub](https://github.com/nihui/NonLocalMeans-GPU) |
+| **nlmeans** | Non-local means denoising | [GitHub](https://github.com/AN3223/dotfiles) |
 
 ## 🔄 Auto-Update
 

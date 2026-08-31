@@ -1,4 +1,4 @@
--- Synced 2026-08-23 from https://raw.githubusercontent.com/mpv-player/mpv/master/TOOLS/lua/autodeint.lua
+-- Synced 2026-08-23 from https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autodeint.lua
 -- The local copy predated this: its own comments still described the old "yadif" default where
 -- current mpv uses bwdif, and it was missing the dominance_label variable entirely. Not covered
 -- by tools\Update-MpvEnvironment.ps1, so re-check this against upstream by hand occasionally.
