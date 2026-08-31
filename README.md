@@ -77,17 +77,17 @@ Shader files are tracked via **Git LFS** to keep repository size manageable.
 
 | Script | Description | Link |
 |--------|-------------|------|
-| **uosc** | Modern UI with menus, timeline, controls | [GitHub](https://github.com/fs932/uosc) |
-| **thumbfast** | Fast thumbnail preview generation | [GitHub](https://github.com/pigigaldo/thumbfast) |
-| **skip_intro** | Automatic intro sequence skipping | [GitHub](https://github.com/Eddow/skip-intro-mark) |
-| **sub-select** | Subtitle track selection menu | [GitHub](https://github.com/tomasklaen/sub-select) |
-| **display/change-refresh** | Dynamic refresh rate switching | [GitHub](https://github.com/Chasiou/display-change-refresh) |
-| **utilities/autocrop** | Automatic video cropping | [GitHub](https://github.com/joeygonz/better-autocrop) |
-| **utilities/autodeint** | Auto deinterlacing | [GitHub](https://github.com/rofl0r/mpv-scripts) |
-| **hdr-toys** | HDR tone-mapping shader suite | [GitHub](https://github.com/hwcr/hdr-toys) |
-| **ravu** | Adaptive resolution zoom | [GitHub](https://github.com/HdrEyes/ravu) |
-| **ArtCNN** | AI-powered upscaling | [GitHub](https://github.com/nihui/artcnn) |
-| **nlmeans** | Non-local means denoising | [GitHub](https://github.com/nihui/nlmeans-gpu) |
+| **uosc** | Modern UI with menus, timeline, controls | [GitHub](https://github.com/tomasklaen/uosc) |
+| **thumbfast** | Fast thumbnail preview generation | [GitHub](https://github.com/po5/thumbfast) |
+| **skip_intro** | Automatic intro sequence skipping | [GitHub](https://github.com/Chinna95P/mpv-anime-build) |
+| **sub-select** | Subtitle track selection menu | [GitHub](https://github.com/CogentRedTester/mpv-sub-select) |
+| **display/change-refresh** | Dynamic refresh rate switching | *(custom)* |
+| **utilities/autocrop** | Automatic video cropping | [GitHub](https://github.com/kevmitch/mpv-autocrop) |
+| **utilities/autodeint** | Auto deinterlacing | [GitHub](https://github.com/mpv-player/mpv) |
+| **hdr-toys** | HDR tone-mapping shader suite | [GitHub](https://github.com/natural-harmonia-gropius/hdr-toys) |
+| **ravu** | Adaptive resolution zoom | [GitHub](https://github.com/bjin/mpv-prescalers) |
+| **ArtCNN** | AI-powered upscaling | [GitHub](https://github.com/Artoriuz/ArtCNN) |
+| **nlmeans** | Non-local means denoising | [GitHub](https://github.com/nihui/NonLocalMeans-GPU) |
 
 ## 🔄 Auto-Update
 
