@@ -1,0 +1,10 @@
+[
+    {
+        "alang": ["es", "es-ES", "es-419", "spa"],
+        "slang": "no"
+    },
+    {
+        "alang": "*",
+        "slang": ["es", "es-ES", "es-419", "en", "eng", "jpn", "ja", "und"]
+    }
+]

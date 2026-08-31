@@ -1,0 +1,8 @@
+<settings>
+  <arch>x86_64-v3</arch>
+  <autodelete>true</autodelete>
+  <getffmpeg>false</getffmpeg>
+  <getytdl>false</getytdl>
+  <ytdlpchannel>unset</ytdlpchannel>
+  <githubtoken>unset</githubtoken>
+</settings>

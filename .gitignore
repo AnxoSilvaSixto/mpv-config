@@ -1,0 +1,17 @@
+# mpv portable config .gitignore
+
+# Cache (auto-generated)
+portable_config/cache/
+
+# Binary files (re-download via updater)
+mpv.exe
+mpv.com
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
