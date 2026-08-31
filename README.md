@@ -131,4 +131,4 @@ portable_config/tools/Update-MpvEnvironment.ps1  # Sync hdr-toys.conf and enviro
 
 ## License
 
-MIT — see upstream script/shader licenses for bundled third-party code.
+Feel free to fork, use, modify, and adapt for your own tracking. No license restrictions — public domain equivalent, do whatever you want.
