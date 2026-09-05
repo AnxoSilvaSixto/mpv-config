@@ -173,9 +173,11 @@ function Update-GitFolder {
                 # (~~/ is documented to sometimes not resolve correctly under a portable_config
                 # setup specifically), the other keeps jedypod over bottosson since upstream's own
                 # hdr-toys.conf hasn't caught up to its own v2504 release notes on that point.
+                # Optional Header field prepends a comment block after transforms (hdr-toys.conf).
                 New-Item -ItemType Directory -Force -Path (Split-Path $dst) | Out-Null
                 $text = Get-Content $src -Raw
                 foreach ($t in $p.Transforms) { $text = $text -replace $t.Find, $t.Replace }
+                if ($p.Header) { $text = $p.Header + $text }
                 $text | Set-Content -Path $dst -NoNewline
             } else {
                 New-Item -ItemType Directory -Force -Path (Split-Path $dst) | Out-Null
@@ -216,11 +218,12 @@ Update-Mpv
 # switched its default to jedypod). See mpv.conf's HDR handling comment for the full reasoning.
 Update-GitFolder -Repo $HdrToysRepo -StateKey 'hdrtoys' -Paths @(
     @{ Source = 'shaders\hdr-toys'; Dest = 'shaders\hdr-toys'; IsDir = $true }
-    @{ Source = 'hdr-toys.conf'; Dest = 'hdr-toys.conf'; IsDir = $false;
-       Transforms = @(
-           @{ Find = [regex]::Escape('~~/shaders/hdr-toys/'); Replace = 'C:/mpv/portable_config/shaders/hdr-toys/' }
-           @{ Find = [regex]::Escape('gamut-mapping/bottosson.glsl'); Replace = 'gamut-mapping/jedypod.glsl' }
-       ) }
+            @{ Source = 'hdr-toys.conf'; Dest = 'hdr-toys.conf'; IsDir = $false;
+               Transforms = @(
+                   @{ Find = [regex]::Escape('~~/shaders/hdr-toys/'); Replace = 'C:/mpv/portable_config/shaders/hdr-toys/' }
+                   @{ Find = [regex]::Escape('gamut-mapping/bottosson.glsl'); Replace = 'gamut-mapping/jedypod.glsl' }
+               );
+               Header = "# !!! AUTO-MANAGED by Update-MpvEnvironment.ps1 !!!`r`n# This file is synced from upstream hdr-toys on every update run.`r`n# Any manual edits will be LOST on the next update.`r`n# To customize HDR behavior, edit mpv.conf profiles instead.`r`n" }
 )
 
 Update-GitFolder -Repo $UoscRepo -StateKey 'uosc' -RepoBranch 'main' -Paths @(
@@ -231,7 +234,7 @@ Update-GitFolder -Repo $UoscRepo -StateKey 'uosc' -RepoBranch 'main' -Paths @(
 
 # thumbfast: single file at the repo root, no subfolder to manage
 Update-GitFolder -Repo $ThumbfastRepo -StateKey 'thumbfast' -Paths @(
-    @{ Source = 'thumbfast.lua'; Dest = 'scripts\thumbfast.lua'; IsDir = $false }
+    @{ Source = 'thumbfast.lua'; Dest = 'scripts\media\thumbfast.lua'; IsDir = $false }
 )
 
 # Clean shader cache files older than 30 days
