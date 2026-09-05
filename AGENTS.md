@@ -15,6 +15,7 @@ C:\mpv\
 │   ├── hdr-toys.conf             # HDR profiles — 59 lines, AUTO-MANAGED, do not edit directly
 │   ├── input.conf                # Keybindings — 51 lines (custom only; uosc/mpv defaults handle rest)
 │   ├── scripts/
+│   │   ├── thumbfast.lua         # Timeline thumbnails (po5/thumbfast) — 32,495 bytes
 │   │   ├── uosc/                 # Modern UI (tomasklaen/uosc) — main.lua 43 KB + 40+ modules
 │   │   │   ├── main.lua          # Entry (43,470 bytes)
 │   │   │   ├── elements/         # Controls, Timeline, Menu, Volume, TopBar etc. (12 files)
@@ -22,7 +23,6 @@ C:\mpv\
 │   │   │   ├── intl/             # 10 locales (de, es, fr, it, pl, pt, ro, ru, tr, uk, zh*)
 │   │   │   └── char-conv/        # zh.json (85 KB)
 │   │   ├── media/
-│   │   │   ├── thumbfast.lua     # Timeline thumbnails (po5/thumbfast) — 32,495 bytes
 │   │   │   ├── sub-select.lua    # Smart subs (CogentRedTester) — 14,940 bytes
 │   │   │   └── skip_intro.lua    # Intro skip (Chinna95P) — 6,123 bytes
 │   │   ├── display/
@@ -32,7 +32,7 @@ C:\mpv\
 │   │   │   ├── autodeint.lua     # Auto deinterlace — 5,862 bytes
 │   │   │   └── mpvSockets.lua    # IPC named pipe per PID — 1,373 bytes (NOT a shim)
 │   │   ├── display/main.lua      # Shim — 116 bytes → require './change-refresh'
-│   │   ├── media/main.lua        # Shim — 209 bytes → require thumbfast/skip_intro/sub-select
+│   │   ├── media/main.lua        # Shim — 232 bytes → require skip_intro/sub-select
 │   │   └── utilities/main.lua    # Shim — 208 bytes → require autocrop/autodeint/mpvSockets
 │   ├── script-opts/
 │   │   ├── uosc.conf             # 102 lines — NieR:Automata theme, floating bar
@@ -150,7 +150,7 @@ C:\mpv\
 | `[Colorspace-NTSC]` | `bt.601-525` | `bt.601-525` | Pre-2000s NTSC |
 | `[Colorspace-PAL]` | `bt.601-625` | `bt.601-625` | Euro PAL |
 | `[gray]` | `p["video-params/pixelformat"]=="gray"` | *removes* CfL/ArtCNN/ravu, `dscale=gaussian` | B&W — skips chroma reconstruction |
-| `[ending]` | `get("time-remaining",0)<=60` | `save-position-on-quit=no` | Final 60s — don't save position |
+| `[ending]` | `get("duration",0)>0 and get("time-remaining",0)<=60` | `save-position-on-quit=no` | Final 60s - do not save position |
 
 - All profiles use `profile-restore=copy` so changes don't leak to next file. Never remove it.
 - Conditions use `height~=nil and height OP` — nil guard required because `height` is nil at startup.
@@ -199,8 +199,8 @@ Used by `installer/updater.ps1:79` (`Get-GitHubToken` checks `settings.xml` → 
 
 ### 3.6 `portable_config/shaders/` and `portable_config/scripts/` — Detailed
 - **Shaders:** `hdr-toys/` 77 files, 298 KB plain text (see tree breakdown above). 4 top-level LFS pointers until `git lfs pull`: `ArtCNN_C4F32.glsl:1` shows `version https://git-lfs.github.com/spec/v1` (131 bytes), similarly CfL/nlmeans 130 bytes, ravu 132 bytes. Real files are binary-ish GLSL hooks, never hand-edit `hdr-toys/` — will be overwritten by `Update-MpvEnvironment.ps1:218`.
-- **Scripts:** `uosc/main.lua` 43 KB + 40+ modules (elements/, lib/, intl/, char-conv/); `media/thumbfast.lua` 32 KB (po5), `sub-select.lua` 14 KB (CogentRedTester), `skip_intro.lua` 6 KB (Chinna95P); `display/change-refresh.lua` 22 KB (custom, base CogentRedTester + Set-RefreshRate.ps1 integration); `utilities/autocrop.lua` 9 KB (kevmitch), `autodeint.lua` 5 KB (mpv upstream). Loader shims are 116–209 byte `require` re-exports; `utilities/mpvSockets.lua` is 1,373 bytes full IPC logic (`mp.set_property("input-ipc-server", "\\\\.\\pipe\\mpvSockets_<pid>")` on Windows, `/tmp/mpvSockets/...sock` on unix). The three `main.lua` shims bundle per-folder so mpv's recursive loader groups them.
-- **Note on thumbfast path:** Upstream `po5/thumbfast` is single file `thumbfast.lua` at repo root. This config loads it via `portable_config/scripts/media/thumbfast.lua` + `media/main.lua:2` (`require './thumbfast'` — path relative to `media/` folder). `Update-MpvEnvironment.ps1:233` currently declares `Dest='scripts\thumbfast.lua'` (root of `scripts/`), which would place it at `scripts/thumbfast.lua` (not `media/`). As of 2026-08-31 the file lives at `media/thumbfast.lua` (32495 bytes) and `scripts/thumbfast.lua` does NOT exist (`Test-Path` false) — the updater's declared path and on-disk path diverge. If thumbfast ever stops updating, check this mismatch first; correct dest should be `scripts\media\thumbfast.lua`.
+- **Scripts:** `uosc/main.lua` 43 KB + 40+ modules (elements/, lib/, intl/, char-conv/); top-level `portable_config/scripts/thumbfast.lua` 32 KB (po5), `sub-select.lua` 14 KB (CogentRedTester), `skip_intro.lua` 6 KB (Chinna95P); `display/change-refresh.lua` 22 KB (custom, base CogentRedTester + Set-RefreshRate.ps1 integration); `utilities/autocrop.lua` 9 KB (kevmitch), `autodeint.lua` 5 KB (mpv upstream). Loader shims are 116–209 byte `require` re-exports; `utilities/mpvSockets.lua` is 1,373 bytes full IPC logic (`mp.set_property("input-ipc-server", "\\\\.\\pipe\\mpvSockets_<pid>")` on Windows, `/tmp/mpvSockets/...sock` on unix). The three `main.lua` shims bundle per-folder so mpv's recursive loader groups them.
+- **thumbfast path:** Upstream `po5/thumbfast` is installed at `portable_config/scripts/thumbfast.lua` at the top level of `scripts/`. `Update-MpvEnvironment.ps1:233` writes `Dest='scripts\\thumbfast.lua'`; mpv discovers the script directly, and `media/main.lua` does not require it.
 
 ### 3.7 Fonts — `portable_config/fonts/`
 - `uosc_icons.ttf` 1,206,668 bytes + `uosc_icons.otf` 400,360 bytes (same icon set, two formats) + `uosc_textures.ttf` 38,228 bytes. Required for uosc UI. Copied by `Update-MpvEnvironment.ps1:228-230` from `uosc/src/fonts/`.
@@ -308,7 +308,7 @@ powershell -File portable_config/tools/Set-RefreshRate.ps1 -Width 1920 -Height 1
 | Add keybind | Edit `input.conf` — add `KEY command #! Menu > Path` for uosc menu, or plain `KEY command` for hidden bind. Preserve `MBTN_RIGHT` | Without `#!` bind won't appear in menu; without `MBTN_RIGHT` menu empty |
 | Update/clean shaders | Run `Update-MpvEnvironment.ps1` or `updater.bat`; never `git add` LFS pointer files | Committing pointer breaks shader for others |
 | Change update schedule | Edit `Register-MpvAutoupdate.ps1:16` (Trigger Delay) or `:19` Settings then re-run it to re-register | Must re-run to apply; old task persists with old schedule |
-| Fix thumbfast not updating | Check `Update-MpvEnvironment.ps1:233` Dest path mismatch (`scripts/thumbfast.lua` vs actual `media/thumbfast.lua`) | Updater silently writes wrong location |
+| Fix thumbfast not updating | Check `Update-MpvEnvironment.ps1:233` and the top-level `portable_config/scripts/thumbfast.lua` destination | Updater must refresh the script in the location mpv scans |
 | Change refresh rates | Edit `changerefresh.conf:10` rates — keep `165` in list | Removing 165 breaks revert to desktop native |
 | Change sub lang priority | Edit `mpv.conf:39` slang/alang and `sub-select.json:1` | Must keep both in sync (mpv.conf vs sub-select json) |
 
@@ -332,7 +332,7 @@ powershell -File portable_config/tools/Set-RefreshRate.ps1 -Width 1920 -Height 1
 7. **Mutex race (2026-08-16):** Two logon triggers overlapped and raced on `$WorkDir` — hence `Global\mpv-autoupdate-lock` mutex (`Update-MpvEnvironment.ps1:202`) + `Register-MpvAutoupdate.ps1:19` `MultipleInstances IgnoreNew`. Don't remove either.
 8. **changerefresh `165` must stay:** Script's revert logic requires desktop native rate in `rates` list (`changerefresh.conf:8-10` comment). User confirmed 165 is native 1440p rate — removing it breaks revert.
 9. **Git LFS 130-byte files:** If `ArtCNN_C4F32.glsl:1` etc. read as `version https://git-lfs.github.com/spec/v1` pointer text, LFS isn't pulled — `git lfs pull`, don't commit pointers. Check with `git lfs ls-files` and `Get-Content ... -First 1`.
-10. **thumbfast updater path mismatch (2026-08-31 observed):** `Update-MpvEnvironment.ps1:233` declares `Dest='scripts\thumbfast.lua'` but actual file lives at `scripts\media\thumbfast.lua` (via `media/main.lua:2` shim). `Test-Path scripts/thumbfast.lua` is false on current install. If `thumbfast` stops updating after a `0f711de...` bump, fix dest to `scripts\media\thumbfast.lua` first. Don't move file without updating shim.
+10. **thumbfast is a top-level script:** `portable_config/scripts/thumbfast.lua` is updated directly by `Update-MpvEnvironment.ps1:233` and is discovered by mpv's recursive script loader. Keep it at the top level; do not restore a nested loader shim.
 11. **Profile condition overlap:** `Res-*` ranges use `height<700`, `700≤h<740`, `740≤h<1340`, `1340≤h<1440`, `h≥1440` — exact 740 boundary matters for 720p vs 1080p. Changing one without adjusting neighbor creates gap/overlap where no profile applies.
 12. **Settings.xml `getytdl=false`:** Means yt-dlp disabled in legacy updater (`installer/updater.ps1:490`). Don't flip to `ytdlp` without also setting `ytdlpchannel` — updater will prompt interactively (9s timeout) and may stall under Scheduled Task hidden window.
 
@@ -344,7 +344,7 @@ powershell -File portable_config/tools/Set-RefreshRate.ps1 -Width 1920 -Height 1
 |-----------|----------|------------|-------------|
 | mpv | [mpv.io](https://mpv.io) / [zhongfly/mpv-winbuild](https://github.com/zhongfly/mpv-winbuild) | `mpv.exe` (122 MB), `installer/updater.ps1` | `updater.bat` + `Update-MpvEnvironment.ps1` API + 7z |
 | uosc | [tomasklaen/uosc](https://github.com/tomasklaen/uosc) | `portable_config/scripts/uosc/` (43 KB + 40 modules) + `fonts/uosc_*` | `Update-MpvEnvironment.ps1:226` via commit SHA → codeload zip |
-| thumbfast | [po5/thumbfast](https://github.com/po5/thumbfast) | `portable_config/scripts/media/thumbfast.lua` (32 KB) | `Update-MpvEnvironment.ps1:232` (note path mismatch §6.10) |
+| thumbfast | [po5/thumbfast](https://github.com/po5/thumbfast) | `portable_config/scripts/thumbfast.lua` (32 KB) | `Update-MpvEnvironment.ps1:233` |
 | hdr-toys | [natural-harmonia-gropius/hdr-toys](https://github.com/natural-harmonia-gropius/hdr-toys) | `portable_config/shaders/hdr-toys/` (77 files, 298 KB) + `hdr-toys.conf:1` | `Update-MpvEnvironment.ps1:217` with 2 transforms |
 | skip_intro | [Chinna95P/mpv-anime-build](https://github.com/Chinna95P/mpv-anime-build/blob/main/scripts/skip_intro.lua) | `portable_config/scripts/media/skip_intro.lua` (6 KB) | Manual vendored |
 | sub-select | [CogentRedTester/mpv-sub-select](https://github.com/CogentRedTester/mpv-sub-select) | `portable_config/scripts/media/sub-select.lua` (14 KB) + `script-opts/sub_select.conf` + `sub-select.json` | Manual vendored |

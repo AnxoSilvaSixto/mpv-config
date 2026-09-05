@@ -26,8 +26,13 @@
 $MpvRepo = 'zhongfly/mpv-winbuild'
 
 # ===== Fixed configuration =====
-$MpvRoot     = 'C:\mpv'                                        # must contain mpv.exe and portable_config\
-$ConfigDir   = Join-Path $MpvRoot 'portable_config'
+# Derive the portable root from this script so the checkout can be relocated.
+$ScriptRoot  = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$ConfigDir   = Split-Path -Parent $ScriptRoot
+$MpvRoot     = Split-Path -Parent $ConfigDir
+if (-not (Test-Path (Join-Path $MpvRoot 'portable_config'))) {
+    throw "Cannot locate portable_config relative to updater: $ConfigDir"
+}
 $ToolsDir    = Join-Path $ConfigDir 'tools'
 $StateFile   = Join-Path $ToolsDir 'update-state.json'         # remembers what version/commit is currently installed
 $LogFile     = Join-Path $ToolsDir 'update-log.txt'
@@ -56,24 +61,43 @@ function Get-State {
     # State = last-installed version/commit per component, so unchanged days do zero downloading.
     $defaults = [pscustomobject]@{ mpv = ''; hdrtoys = ''; uosc = ''; thumbfast = '' }
     if (Test-Path $StateFile) {
-        $loaded = Get-Content $StateFile -Raw | ConvertFrom-Json
-        # Backfill any key missing from an older state file - e.g. thumbfast (added 2026-08-19)
-        # is absent from every state.json written before today. PSCustomObject throws if you
-        # dot-assign a property that doesn't already exist, so this runs once here instead of
-        # needing every Update-GitFolder call to guard itself.
-        foreach ($prop in $defaults.PSObject.Properties.Name) {
-            if ($loaded.PSObject.Properties.Name -notcontains $prop) {
-                $loaded | Add-Member -NotePropertyName $prop -NotePropertyValue ''
+        try {
+            $loaded = Get-Content $StateFile -Raw | ConvertFrom-Json -ErrorAction Stop
+            if (($null -eq $loaded) -or ($loaded -is [array]) -or ($loaded -isnot [psobject])) {
+                throw 'state JSON must contain one object'
             }
+
+            # Copy only known scalar fields. This backfills older state files and avoids
+            # trusting arbitrary JSON members when the file was edited or truncated.
+            foreach ($prop in $defaults.PSObject.Properties.Name) {
+                $value = $loaded.PSObject.Properties[$prop]
+                if ($value -and ($null -ne $value.Value)) {
+                    $defaults.$prop = [string]$value.Value
+                }
+            }
+            return $defaults
+        } catch {
+            Write-Log "state: invalid JSON, treating all components as needing an update - $($_.Exception.Message)"
+            return $defaults
         }
-        return $loaded
     }
     return $defaults  # first-ever run: nothing recorded yet, everything updates once
 }
 
 function Save-State {
     param($State)
-    $State | ConvertTo-Json | Set-Content -Path $StateFile
+    $tempState = "$StateFile.$([guid]::NewGuid().ToString('N')).tmp"
+    try {
+        $json = $State | ConvertTo-Json -Depth 3
+        [System.IO.File]::WriteAllText($tempState, $json, (New-Object System.Text.UTF8Encoding($false)))
+        if (Test-Path $StateFile) {
+            [System.IO.File]::Replace($tempState, $StateFile, $null)
+        } else {
+            [System.IO.File]::Move($tempState, $StateFile)
+        }
+    } finally {
+        Remove-Item $tempState -Force -ErrorAction SilentlyContinue
+    }
 }
 
 $State = Get-State
@@ -84,7 +108,7 @@ function Update-Mpv {
         $release = Invoke-RestMethod "https://api.github.com/repos/$MpvRepo/releases/latest" -Headers $GhHeaders
         if ($release.tag_name -eq $State.mpv) {
             Write-Log "mpv: already on $($release.tag_name), nothing to do"
-            return
+            return $true
         }
 
         # Matches the AVX2 (x86-64-v3) player build. Changed 2026-08-23 from the plain
@@ -100,7 +124,7 @@ function Update-Mpv {
             # plain build on days like this: v3-only was a considered choice (performance over
             # always-latest), so this just waits for the next release that has a v3 asset instead.
             Write-Log "mpv: no matching x86_64 asset in release $($release.tag_name) - skipping this run"
-            return
+            return $false
         }
 
         # 7-Zip lookup: PATH first, then the two standard install locations.
@@ -111,7 +135,7 @@ function Update-Mpv {
         }
         if (-not $SevenZip) {
             Write-Log "mpv: 7-Zip not found (install from https://www.7-zip.org) - skipping mpv update for now"
-            return
+            return $false
         }
 
         Write-Log "mpv: updating '$($State.mpv)' -> '$($release.tag_name)'"
@@ -125,13 +149,18 @@ function Update-Mpv {
         # /XD portable_config: even though these builds don't currently ship one, this
         # guarantees a future build never overwrites your live config by surprise.
         robocopy $extractDir $MpvRoot /E /XD portable_config /NFL /NDL /NJH /NJS | Out-Null
+        if ($LASTEXITCODE -ge 8) {
+            throw "robocopy failed with exit code $LASTEXITCODE"
+        }
 
         Remove-Item $archivePath, $extractDir -Recurse -Force -ErrorAction SilentlyContinue
         $State.mpv = $release.tag_name
         Write-Log "mpv: done, now on $($release.tag_name)"
+        return $true
     } catch {
         # Any failure here just skips this component for today; it never stops hdr-toys/uosc below.
         Write-Log "mpv: FAILED - $($_.Exception.Message)"
+        return $false
     }
 }
 
@@ -148,7 +177,7 @@ function Update-GitFolder {
         $sha = $commit.sha
         if ($sha -eq $State.$StateKey) {
             Write-Log "$Repo`: already on $sha, nothing to do"
-            return
+            return $true
         }
 
         Write-Log "$Repo`: updating '$($State.$StateKey)' -> '$sha'"
@@ -163,9 +192,12 @@ function Update-GitFolder {
         foreach ($p in $Paths) {
             $src = Join-Path $repoRoot.FullName $p.Source
             $dst = Join-Path $ConfigDir $p.Dest
+            if (-not (Test-Path $src)) {
+                throw "source path not found in $Repo`: $($p.Source)"
+            }
             if ($p.IsDir) {
                 Remove-Item $dst -Recurse -Force -ErrorAction SilentlyContinue   # wholesale replace, matching upstream's own update pattern
-                Copy-Item $src $dst -Recurse -Force
+                Copy-Item $src $dst -Recurse -Force -ErrorAction Stop
             } elseif ($p.Transforms) {
                 # Text transforms instead of a byte-for-byte copy (each: @{Find=...; Replace=...},
                 # applied in order). Added 2026-08-25, currently only used for hdr-toys.conf: one
@@ -175,21 +207,23 @@ function Update-GitFolder {
                 # hdr-toys.conf hasn't caught up to its own v2504 release notes on that point.
                 # Optional Header field prepends a comment block after transforms (hdr-toys.conf).
                 New-Item -ItemType Directory -Force -Path (Split-Path $dst) | Out-Null
-                $text = Get-Content $src -Raw
+                $text = Get-Content $src -Raw -ErrorAction Stop
                 foreach ($t in $p.Transforms) { $text = $text -replace $t.Find, $t.Replace }
                 if ($p.Header) { $text = $p.Header + $text }
-                $text | Set-Content -Path $dst -NoNewline
+                $text | Set-Content -Path $dst -NoNewline -ErrorAction Stop
             } else {
                 New-Item -ItemType Directory -Force -Path (Split-Path $dst) | Out-Null
-                Copy-Item $src $dst -Force
+                Copy-Item $src $dst -Force -ErrorAction Stop
             }
         }
 
         Remove-Item $zipPath, $extractDir -Recurse -Force -ErrorAction SilentlyContinue
         $State.$StateKey = $sha
         Write-Log "$Repo`: done, now on $sha"
+        return $true
     } catch {
         Write-Log "$Repo`: FAILED - $($_.Exception.Message)"
+        return $false
     }
 }
 
@@ -232,9 +266,9 @@ Update-GitFolder -Repo $UoscRepo -StateKey 'uosc' -RepoBranch 'main' -Paths @(
     @{ Source = 'src\fonts\uosc_textures.ttf';  Dest = 'fonts\uosc_textures.ttf'; IsDir = $false }
 )
 
-# thumbfast: single file at the repo root, no subfolder to manage
+# thumbfast: single file at the repo root, loaded by mpv as the top-level "thumbfast" script
 Update-GitFolder -Repo $ThumbfastRepo -StateKey 'thumbfast' -Paths @(
-    @{ Source = 'thumbfast.lua'; Dest = 'scripts\media\thumbfast.lua'; IsDir = $false }
+    @{ Source = 'thumbfast.lua'; Dest = 'scripts\thumbfast.lua'; IsDir = $false }
 )
 
 # Clean shader cache files older than 30 days
