@@ -153,12 +153,22 @@ if (-not (Test-Path $Mpv)) {
     }
 }
 
-# These paths are intentionally retained pending a verified relocation test.
-if ($updater -match 'C:/mpv/portable_config/shaders/hdr-toys') {
-    Warn 'hdr-toys updater transform still emits C:/mpv paths; portable relocation needs a verified transform test'
+# Validate that relocation-sensitive paths are derived from the active config root.
+$refreshScript = Get-Content (Join-Path $Root 'portable_config/scripts/display/change-refresh.lua') -Raw
+$expectedHdrRoot = ((Join-Path $ConfigDir 'shaders\hdr-toys') -replace '\\', '/')
+$probePath = 'C:\portable_config\shaders\hdr-toys'
+$normalizedProbe = $probePath -replace '\\', '/'
+$hasPsNormalizer = [regex]::IsMatch($updater, "-replace\s+'\\\\'\s*,\s*'/'")
+if (($updater -match '\$HdrShaderRoot') -and $hasPsNormalizer -and ($updater -notmatch 'C:/mpv/portable_config/shaders/hdr-toys') -and ($normalizedProbe -eq 'C:/portable_config/shaders/hdr-toys')) {
+    Pass "hdr-toys updater derives normalized shader paths from config root ($expectedHdrRoot)"
+} else {
+    Fail 'hdr-toys updater has a missing, hard-coded, or invalid shader path transform'
 }
-if ((Get-Content (Join-Path $Root 'portable_config/scripts/display/change-refresh.lua') -Raw) -match 'helper_script\s*=\s*"C:/mpv/') {
-    Warn "refresh helper uses the existing C:/mpv absolute path; fallback resolution remains unverified"
+$hasLuaNormalizer = $refreshScript.Contains("gsub('\\', '/')")
+if (($refreshScript -match "mp\.get_property\('config-dir'\)") -and $hasLuaNormalizer -and ($refreshScript -notmatch 'helper_script\s*=\s*["'']C:/mpv/')) {
+    Pass 'refresh helper derives and normalizes its path from mpv config-dir'
+} else {
+    Fail 'refresh helper path is hard-coded, missing config-dir resolution, or not normalized'
 }
 
 Write-Host "Audit complete: $errors error(s), $warnings warning(s)."
