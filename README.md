@@ -45,7 +45,7 @@ C:\mpv\
 
 The HDR configuration is a local tone-mapping choice, not proof that every display path is HDR-capable. Test Windows HDR state, monitor mode, connection, and representative HDR content separately. `Alt+h` removes the configured hdr-toys shaders and restores mpv native tone mapping for comparison. `hdr-toys.conf` is auto-managed; edit `mpv.conf` or the updater transform policy rather than editing the generated file.
 
-The updater currently preserves verified local hdr-toys transforms, including absolute `C:/mpv/...` shader paths and the jedypod mapping. Those transforms have not been generalized for relocation because doing so without testing could break shader loading.
+The updater preserves the verified local hdr-toys transforms, including the jedypod mapping, while deriving the generated shader path from the active portable configuration directory. This avoids hard-coding `C:/mpv` in generated output.
 
 ## Updaters
 
@@ -88,8 +88,8 @@ The audit checks required paths, the standalone thumbfast layout, the `[ending]`
 
 ## Known limitations
 
-- The refresh helper remains `C:/mpv/portable_config/tools/Set-RefreshRate.ps1` in the vendored Lua options. Fallback resolution from the script's own location was not changed because the existing code does not provide a verified portable lookup path; the audit reports this gap.
-- hdr-toys updater transforms still emit `C:/mpv` paths. Relocation is not claimed to work until the upstream config and shader loading have been tested together.
+- The refresh helper is derived from mpv's active `config-dir`, so the portable tree can move without editing the vendored Lua script. If a host does not expose that property, the script falls back to the relative `tools/Set-RefreshRate.ps1` path and should be tested explicitly.
+- The hdr-toys updater derives generated shader paths from the active portable configuration directory. Generated shader loading and Win32 refresh switching still need a real media/display test after moving the tree.
 - `[ending]` now requires a positive duration before disabling position save, but conditional profile behavior should be tested with actual media, not only an idle startup.
 - The change-refresh script uses Win32 display APIs and can be unpredictable when the mpv window spans multiple displays.
 - Upstream updates can change scripts or shader behavior. Review the update log and keep backups.

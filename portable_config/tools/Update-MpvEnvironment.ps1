@@ -37,6 +37,7 @@ $ToolsDir    = Join-Path $ConfigDir 'tools'
 $StateFile   = Join-Path $ToolsDir 'update-state.json'         # remembers what version/commit is currently installed
 $LogFile     = Join-Path $ToolsDir 'update-log.txt'
 $WorkDir     = Join-Path $env:TEMP 'mpv-autoupdate'            # scratch space, cleaned up after each run
+$HdrShaderRoot = ((Join-Path $ConfigDir 'shaders\hdr-toys') -replace '\\', '/')
 
 $HdrToysRepo   = 'natural-harmonia-gropius/hdr-toys'              # matches the shaders already in shaders\hdr-toys\
 $UoscRepo      = 'tomasklaen/uosc'                                # upstream uosc (fork was stale, last push 2026-08-17)
@@ -201,7 +202,7 @@ function Update-GitFolder {
             } elseif ($p.Transforms) {
                 # Text transforms instead of a byte-for-byte copy (each: @{Find=...; Replace=...},
                 # applied in order). Added 2026-08-25, currently only used for hdr-toys.conf: one
-                # rule rewrites its ~~/ shader paths to this config's C:/ absolute-path convention
+                # rule rewrites its ~~/ shader paths to a normalized path under this config root
                 # (~~/ is documented to sometimes not resolve correctly under a portable_config
                 # setup specifically), the other keeps jedypod over bottosson since upstream's own
                 # hdr-toys.conf hasn't caught up to its own v2504 release notes on that point.
@@ -254,7 +255,7 @@ Update-GitFolder -Repo $HdrToysRepo -StateKey 'hdrtoys' -Paths @(
     @{ Source = 'shaders\hdr-toys'; Dest = 'shaders\hdr-toys'; IsDir = $true }
             @{ Source = 'hdr-toys.conf'; Dest = 'hdr-toys.conf'; IsDir = $false;
                Transforms = @(
-                   @{ Find = [regex]::Escape('~~/shaders/hdr-toys/'); Replace = 'C:/mpv/portable_config/shaders/hdr-toys/' }
+                   @{ Find = [regex]::Escape('~~/shaders/hdr-toys/'); Replace = "$HdrShaderRoot/" }
                    @{ Find = [regex]::Escape('gamut-mapping/bottosson.glsl'); Replace = 'gamut-mapping/jedypod.glsl' }
                );
                Header = "# !!! AUTO-MANAGED by Update-MpvEnvironment.ps1 !!!`r`n# This file is synced from upstream hdr-toys on every update run.`r`n# Any manual edits will be LOST on the next update.`r`n# To customize HDR behavior, edit mpv.conf profiles instead.`r`n" }

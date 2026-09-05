@@ -26,6 +26,7 @@ $errors = 0
 $warnings = 0
 
 function Pass([string]$Message) { Write-Host "PASS: $Message" -ForegroundColor Green }
+function Info([string]$Message) { Write-Host "INFO: $Message" -ForegroundColor Cyan }
 function Warn([string]$Message) { $script:warnings++; Write-Host "WARN: $Message" -ForegroundColor Yellow }
 function Fail([string]$Message) { $script:errors++; Write-Host "FAIL: $Message" -ForegroundColor Red }
 function Check-Path([string]$RelativePath) {
@@ -128,7 +129,7 @@ if (-not (Test-Path $Mpv)) {
             $log = Get-Content $TempLog -Raw
             $scriptsLoaded = $log -match '(?m)^\s*\[[^\r\n\]]+\]\[v\]\[cplayer\]\s+Done loading scripts\.'
             if ($timedOut -and $scriptsLoaded) {
-                Warn "mpv completed script loading but remained active; stopped only audit-owned process PID $($process.Id) at $StartupTimeoutSeconds seconds"
+                Info "mpv completed script loading but remained active; stopped only audit-owned process PID $($process.Id) at $StartupTimeoutSeconds seconds"
                 Pass 'mpv idle startup completed script loading before bounded timeout'
             } elseif ($timedOut) {
                 Fail "mpv startup did not complete within $StartupTimeoutSeconds seconds"

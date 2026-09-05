@@ -47,11 +47,21 @@ msg = require 'mp.msg'
 utils = require 'mp.utils'
 require 'mp.options'
 
+-- Resolve the helper from mpv's active config directory so the portable tree
+-- can be moved without changing this vendored script.
+local function default_helper_script()
+    local config_dir = mp.get_property('config-dir')
+    if config_dir and config_dir ~= '' then
+        return config_dir:gsub('\\', '/') .. '/tools/Set-RefreshRate.ps1'
+    end
+    return 'tools/Set-RefreshRate.ps1'
+end
+
 --options available through --script-opts=changerefresh-[option]=value
 --all of these options can be changed at runtime using profiles, the script will automatically update
 local options = {
     --the location of Set-RefreshRate.ps1 (PowerShell-native, no third-party tool required)
-    helper_script = "C:/mpv/portable_config/tools/Set-RefreshRate.ps1",
+    helper_script = default_helper_script(),
 
     --list of valid refresh rates, separated by semicolon, listed in ascending order
     --by adding a hyphen after a number you can set a custom display rate for that specific video rate:
