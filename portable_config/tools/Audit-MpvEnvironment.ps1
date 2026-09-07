@@ -156,16 +156,20 @@ if (-not (Test-Path $Mpv)) {
 # Validate that relocation-sensitive paths are derived from the active config root.
 $refreshScript = Get-Content (Join-Path $Root 'portable_config/scripts/display/change-refresh.lua') -Raw
 $expectedHdrRoot = ((Join-Path $ConfigDir 'shaders\hdr-toys') -replace '\\', '/')
-$probePath = 'C:\portable_config\shaders\hdr-toys'
+$probeConfigDir = Join-Path $env:TEMP 'mpv-audit-portable_config'
+$probePath = Join-Path $probeConfigDir 'shaders\hdr-toys'
 $normalizedProbe = $probePath -replace '\\', '/'
+$hasHdrAssignment = $updater -match '\$HdrShaderRoot\s*=\s*\(\(Join-Path\s+\$ConfigDir'
+$hasHdrTransform = $updater -match 'Replace\s*=\s*"\$HdrShaderRoot/"'
 $hasPsNormalizer = [regex]::IsMatch($updater, "-replace\s+'\\\\'\s*,\s*'/'")
-if (($updater -match '\$HdrShaderRoot') -and $hasPsNormalizer -and ($updater -notmatch 'C:/mpv/portable_config/shaders/hdr-toys') -and ($normalizedProbe -eq 'C:/portable_config/shaders/hdr-toys')) {
+if ($hasHdrAssignment -and $hasHdrTransform -and $hasPsNormalizer -and ($updater -notmatch 'C:/mpv/portable_config/shaders/hdr-toys') -and ($normalizedProbe -eq (($probeConfigDir + '\shaders\hdr-toys') -replace '\\', '/'))) {
     Pass "hdr-toys updater derives normalized shader paths from config root ($expectedHdrRoot)"
 } else {
     Fail 'hdr-toys updater has a missing, hard-coded, or invalid shader path transform'
 }
 $hasLuaNormalizer = $refreshScript.Contains("gsub('\\', '/')")
-if (($refreshScript -match "mp\.get_property\('config-dir'\)") -and $hasLuaNormalizer -and ($refreshScript -notmatch 'helper_script\s*=\s*["'']C:/mpv/')) {
+$hasLuaAssignment = $refreshScript -match 'helper_script\s*=\s*default_helper_script\(\)'
+if (($refreshScript -match "mp\.get_property\('config-dir'\)") -and $hasLuaNormalizer -and $hasLuaAssignment -and ($refreshScript -notmatch 'helper_script\s*=\s*["'']C:/mpv/')) {
     Pass 'refresh helper derives and normalizes its path from mpv config-dir'
 } else {
     Fail 'refresh helper path is hard-coded, missing config-dir resolution, or not normalized'

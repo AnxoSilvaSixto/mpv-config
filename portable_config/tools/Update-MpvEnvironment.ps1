@@ -72,7 +72,12 @@ function Get-State {
             # trusting arbitrary JSON members when the file was edited or truncated.
             foreach ($prop in $defaults.PSObject.Properties.Name) {
                 $value = $loaded.PSObject.Properties[$prop]
-                if ($value -and ($null -ne $value.Value)) {
+                # Added 2026-09-06: on 2026-09-05 hdrtoys was found on disk as
+                # '0000...0000' (git's own "no commit" sentinel - never a value this
+                # script writes itself) between two otherwise-clean runs, causing a
+                # pointless resync. Treat that one specific value the same as a missing
+                # key instead of trusting it, whatever wrote it.
+                if ($value -and ($null -ne $value.Value) -and ([string]$value.Value) -ne ('0' * 40)) {
                     $defaults.$prop = [string]$value.Value
                 }
             }
@@ -176,6 +181,14 @@ function Update-GitFolder {
     try {
         $commit = Invoke-RestMethod "https://api.github.com/repos/$Repo/commits/$RepoBranch" -Headers $GhHeaders
         $sha = $commit.sha
+        if ([string]::IsNullOrEmpty($sha) -or $sha -eq ('0' * 40)) {
+            # Added 2026-09-06: belt-and-suspenders alongside the Get-State check above -
+            # a healthy GitHub response should never give a null/empty sha or the all-zero
+            # sentinel. If this ever fires, it points at the API/response side rather than
+            # the on-disk state file.
+            Write-Log "$Repo`: API returned an invalid commit reference ('$sha') - skipping this run, will retry next time"
+            return $false
+        }
         if ($sha -eq $State.$StateKey) {
             Write-Log "$Repo`: already on $sha, nothing to do"
             return $true
@@ -272,23 +285,33 @@ Update-GitFolder -Repo $ThumbfastRepo -StateKey 'thumbfast' -Paths @(
     @{ Source = 'thumbfast.lua'; Dest = 'scripts\thumbfast.lua'; IsDir = $false }
 )
 
-# Clean shader cache files older than 30 days
-$shaderCacheDir = Join-Path $ConfigDir 'cache\shaders_cache'
-if (Test-Path $shaderCacheDir) {
-    Get-ChildItem $shaderCacheDir -File | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-30) } | Remove-Item -Force -ErrorAction SilentlyContinue
-}
+# Added 2026-09-06: wrapped in try/catch. A run on 2026-09-06 12:20 checked every
+# component successfully but never reached Save-State or the "finished" line below -
+# nothing here logged why, so a hiccup in one of these three housekeeping steps
+# (locked file, deleted directory, etc.) is the only thing left that explains it.
+# None of this is essential to a successful update, so it must never be able to take
+# Save-State down with it - and if it does throw again, we'll see it in the log this time.
+try {
+    # Clean shader cache files older than 30 days
+    $shaderCacheDir = Join-Path $ConfigDir 'cache\shaders_cache'
+    if (Test-Path $shaderCacheDir) {
+        Get-ChildItem $shaderCacheDir -File | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-30) } | Remove-Item -Force -ErrorAction SilentlyContinue
+    }
 
-# Clean watch-later files older than 7 days
-$watchLaterDir = Join-Path $ConfigDir 'cache\watch_later'
-if (Test-Path $watchLaterDir) {
-    Get-ChildItem $watchLaterDir -File | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) } | Remove-Item -Force -ErrorAction SilentlyContinue
-}
+    # Clean watch-later files older than 7 days
+    $watchLaterDir = Join-Path $ConfigDir 'cache\watch_later'
+    if (Test-Path $watchLaterDir) {
+        Get-ChildItem $watchLaterDir -File | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) } | Remove-Item -Force -ErrorAction SilentlyContinue
+    }
 
-# Rotate log if exceeding 500 lines
-if ((Get-Content $LogFile).Count -gt 500) {
-    $recent = Get-Content $LogFile -Tail 400
-    $recent | Set-Content $LogFile
-    Write-Log "log rotated (was >500 lines, kept last 400)"
+    # Rotate log if exceeding 500 lines
+    if ((Get-Content $LogFile).Count -gt 500) {
+        $recent = Get-Content $LogFile -Tail 400
+        $recent | Set-Content $LogFile
+        Write-Log "log rotated (was >500 lines, kept last 400)"
+    }
+} catch {
+    Write-Log "cleanup step failed, continuing anyway so state still gets saved - $($_.Exception.Message)"
 }
 
 Save-State $State
