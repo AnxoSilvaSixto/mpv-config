@@ -74,7 +74,7 @@ C:\mpv\
 ├── mpv.exe                       # 122,371,072 bytes — DO NOT COMMIT (managed by updater)
 ├── mpv.com                       # 3,584 bytes — console stub — DO NOT COMMIT
 ├── settings.xml                  # 8 lines — updater settings (arch, autodelete, getffmpeg, ytdlp channel, token)
-├── updater.bat                   # 24 lines — entry point → installer/updater.ps1
+├── updater.bat                   # entry point → portable_config/tools/Update-MpvEnvironment.ps1
 ├── mpv-register.bat              # 6 lines — calls `mpv --register` (file association)
 ├── mpv-unregister.bat            # 6 lines — calls `mpv --unregister`
 ├── .gitignore                    # 22 lines — ignores mpv.exe/com, cache/, update-state/log
@@ -219,11 +219,12 @@ Two updaters coexist — **don't confuse them**:
 
 | Tool | Purpose | When to run | Touches |
 |------|---------|-------------|---------|
-| `updater.bat` → `installer/updater.ps1` (796 lines) | **Legacy/full** mpv + yt-dlp/youtube-dl + ffmpeg + deno | Manual, interactive, 9s prompts | `mpv.exe`, `yt-dlp.exe`, `ffmpeg.exe`, `deno.exe`, `settings.xml` |
 | `portable_config/tools/Update-MpvEnvironment.ps1` (263 lines) | **Daily preferred** mpv + hdr-toys + uosc + thumbfast | Every login (Scheduled Task) | `mpv.exe`, `shaders/hdr-toys/`, `scripts/uosc/`, `fonts/`, `scripts/thumbfast.lua`, `hdr-toys.conf` |
+| `updater.bat` → `portable_config/tools/Update-MpvEnvironment.ps1` (324 lines) | **Preferred** mpv + hdr-toys + uosc + thumbfast | Manual run (same script the login task uses) | `mpv.exe`, `shaders/hdr-toys/`, `scripts/uosc/`, `fonts/`, `scripts/thumbfast.lua`, `hdr-toys.conf` |
+| `installer/updater.ps1` (796 lines, invoke directly) | **Legacy/full** mpv + yt-dlp/youtube-dl + ffmpeg + deno | Manual, interactive, 9s prompts | `mpv.exe`, `yt-dlp.exe`, `ffmpeg.exe`, `deno.exe`, `settings.xml` |
 
-### 4.1 `updater.bat` — 24 lines
-Thin wrapper: `pushd %~dp0`, detects `pwsh` vs `powershell` (`where pwsh`), runs `installer/updater.ps1` with `Bypass`, cleans stray `updater.ps1` in root if exists, `timeout 5`. Always use this as entry point, not calling `installer/updater.ps1` directly.
+### 4.1 `updater.bat`
+Thin wrapper: `pushd %~dp0`, detects `pwsh` vs `powershell` (`where pwsh`), runs `portable_config/tools/Update-MpvEnvironment.ps1` with `Bypass`, `timeout 5`. Always use this as entry point for component updates, not calling the ps1 directly. For the legacy yt-dlp/ffmpeg workflow, invoke `installer/updater.ps1` directly.
 
 ### 4.2 `installer/updater.ps1` — 796 lines — Legacy updater
 - Source: `zhongfly/mpv-winbuild` releases (configurable via `settings.xml:arch`, or `shinchiro/mpv-winbuild-cmake` alternative comment `Update-MpvEnvironment.ps1:22-25`)

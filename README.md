@@ -25,8 +25,8 @@ C:\mpv\
 │       ├── Audit-MpvEnvironment.ps1    # read-only validation/audit
 │       ├── Register-MpvAutoupdate.ps1
 │       └── Set-RefreshRate.ps1
-├── installer/updater.ps1              # legacy/full interactive updater
-├── updater.bat                        # wrapper for installer/updater.ps1
+├── installer/updater.ps1              # legacy/full interactive updater (invoke directly)
+├── updater.bat                        # wrapper for portable_config/tools/Update-MpvEnvironment.ps1
 ├── settings.xml                       # legacy updater settings
 └── AGENTS.md                          # maintenance rules
 ```
@@ -72,7 +72,7 @@ Start-ScheduledTask -TaskName mpv-autoupdate
 
 ### Legacy/full updater
 
-`updater.bat` invokes `installer/updater.ps1` for the interactive mpv/ffmpeg/yt-dlp workflow. Its `settings.xml` token field is optional. Never paste personal GitHub or service credentials into tracked files.
+`updater.bat` invokes `portable_config/tools/Update-MpvEnvironment.ps1`, the same component updater the login task runs. For the legacy interactive mpv/ffmpeg/yt-dlp workflow, invoke `installer/updater.ps1` directly. Its `settings.xml` token field is optional. Never paste personal GitHub or service credentials into tracked files.
 
 ## Validation
 

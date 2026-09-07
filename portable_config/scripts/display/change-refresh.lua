@@ -91,8 +91,8 @@ local options = {
 
     --default width and height to use when changing & reverting the refresh rate
     --ony used if detect_display_resolution is false
-    original_width = 1920,
-    original_height = 1080,
+    original_width = 2560,
+    original_height = 1440,
 
     --if this value is set to anything but zero to script will always to to revert to this rate
     --this rate bypasses the usual rates whitelist, so make sure it is valid
@@ -333,11 +333,17 @@ end
 function getDisplayDetails()
     local name = mp.get_property_native('display-names')
 
+    --no display attached (vo=null, image/audio-only output): nothing to switch, bail out quietly
+    if name == nil or #name == 0 then
+        msg.verbose('no display attached, skipping refresh handling')
+        return nil, nil
+    end
+
     --the display-fps property always refers to the display with the lowest refresh rate
     --there is no way to test which display this is, so reverting the refresh when mpv is on multiple monitors is unpredictable
     --however, by default I'm just selecting whatever the first monitor in the list is
     if #name > 1 then
-        msg.warn('mpv window is on multiplem displays, script may revert to wrong display rate')
+        msg.warn('mpv window is on multiple displays, script may revert to wrong display rate')
     end
 
     name = name[1]
@@ -414,6 +420,9 @@ end
 function matchVideo()
     --gets display details
     local dname, dnumber = getDisplayDetails()
+    if dname == nil then
+        return
+    end
 
     --if the change is executed on a different monitor to the previous, and the previous monitor has not been been reverted
     --then revert the previous changes before changing the new monitor
@@ -519,6 +528,11 @@ function scriptMessage(width, height, rate, display)
     local name
     if display == nil then
         name, display = getDisplayDetails()
+    end
+
+    if display == nil then
+        msg.warn('no display attached, ignoring change-refresh message')
+        return
     end
 
     if width == nil or height == nil or rate == nil then
