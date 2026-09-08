@@ -335,22 +335,41 @@ Update-GitFolder -Repo $UlyssesRepo -StateKey 'ulysses' -RepoBranch $UlyssesBran
 
 # Post-process track-selector to preserve es dub -> no subs patch (faithful to slang=es)
 # If upstream overwrote our es block, re-inject it. Idempotent: only patches if marker missing.
-$trackSelectorPath = Join-Path $ConfigDir 'scripts\track-selector.lua'
-if (Test-Path $trackSelectorPath) {
-    $trackContent = Get-Content $trackSelectorPath -Raw
-    if ($trackContent -notmatch 'Spanish audio detected') {
-        Write-Log "track-selector: re-applying es dub patch (Spanish audio -> no subs)"
-        # Current layout (2026-09+): selected_audio_lang is initialized to "" then populated via loop;
-        # inject before the CONTEXT DETECTION marker which exists in all recent versions.
-        if ($trackContent -match "-- 2\. CONTEXT DETECTION") {
-            $esBlock = "    -- faithful to user slang=es prioritization: if we selected Spanish audio, don't show subs`r`n    if selected_audio_lang and selected_audio_lang:find('^es') then`r`n        msg.info('Smart Sub: Spanish audio detected (' .. selected_audio_lang .. ') -> disabling subs per es dub rule')`r`n        if mp.get_property('sid') ~= 'no' then`r`n            mark_internal_change('subtitle', 'no')`r`n            mp.set_property('sid', 'no')`r`n        end`r`n        return`r`n    end`r`n    local _es_patched = true`r`n`r`n    -- 2. CONTEXT DETECTION"
-            $trackContent = $trackContent -replace "-- 2\. CONTEXT DETECTION", $esBlock
+try {
+    $trackSelectorPath = Join-Path $ConfigDir 'scripts\track-selector.lua'
+    if (Test-Path $trackSelectorPath) {
+        $trackContent = Get-Content $trackSelectorPath -Raw
+        if (($trackContent -match 'Spanish audio detected') -or ($trackContent -match '_es_patched')) {
+            # already patched, skip
         } else {
-            # Legacy fallback: very old file used mp.get_property('audio-params/lang') inline
-            $trackContent = $trackContent -replace "local selected_audio_lang = mp.get_property\('audio-params/lang'\)", "local selected_audio_lang = mp.get_property('audio-params/lang')`r`n    -- faithful to user slang=es prioritization: if we selected Spanish audio, don't show subs`r`n    if selected_audio_lang and selected_audio_lang:find('^es') then`r`n        msg.info('Smart Sub: Spanish audio detected (' .. selected_audio_lang .. ') -> disabling subs per es dub rule')`r`n        local selected_sid = 'no'`r`n        mark_internal_change('sid', selected_sid)`r`n        msg.info('Smart Sub: Spanish audio ...')`r`n        return`r`n    end`r`n    local _es_patched = true"
+            Write-Log "track-selector: re-applying es dub patch (Spanish audio -> no subs)"
+            $trackSelectorPatched = $false
+            # Current layout (2026-09+): selected_audio_lang is initialized to "" then populated via loop;
+            # inject before the CONTEXT DETECTION marker which exists in all recent versions.
+            if ($trackContent -match "-- 2\. CONTEXT DETECTION") {
+                $esBlock = "    -- faithful to user slang=es prioritization: if we selected Spanish audio, don't show subs`r`n    if selected_audio_lang and selected_audio_lang:find('^es') then`r`n        msg.info('Smart Sub: Spanish audio detected (' .. selected_audio_lang .. ') -> disabling subs per es dub rule')`r`n        if mp.get_property('sid') ~= 'no' then`r`n            mark_internal_change('subtitle', 'no')`r`n            mp.set_property('sid', 'no')`r`n        end`r`n        return`r`n    end`r`n    local _es_patched = true`r`n`r`n    -- 2. CONTEXT DETECTION"
+                $trackContent = $trackContent -replace "-- 2\. CONTEXT DETECTION", $esBlock
+                $trackSelectorPatched = $true
+            } elseif ($trackContent -match "local selected_audio_lang = mp\.get_property\('audio-params/lang'\)") {
+                # Legacy fallback: very old file used mp.get_property('audio-params/lang') inline
+                $trackContent = $trackContent -replace "local selected_audio_lang = mp.get_property\('audio-params/lang'\)", "local selected_audio_lang = mp.get_property('audio-params/lang')`r`n    -- faithful to user slang=es prioritization: if we selected Spanish audio, don't show subs`r`n    if selected_audio_lang and selected_audio_lang:find('^es') then`r`n        msg.info('Smart Sub: Spanish audio detected (' .. selected_audio_lang .. ') -> disabling subs per es dub rule')`r`n        local selected_sid = 'no'`r`n        mark_internal_change('sid', selected_sid)`r`n        msg.info('Smart Sub: Spanish audio ...')`r`n        return`r`n    end`r`n    local _es_patched = true"
+                $trackSelectorPatched = $true
+            } else {
+                Write-Log "track-selector: patch skipped - no known anchor found (unexpected layout)"
+            }
+            if ($trackSelectorPatched) {
+                $trackSelectorTmp = "$trackSelectorPath.$([guid]::NewGuid().ToString('N')).tmp"
+                try {
+                    [System.IO.File]::WriteAllText($trackSelectorTmp, $trackContent, (New-Object System.Text.UTF8Encoding($false)))
+                    Move-Item -Path $trackSelectorTmp -Destination $trackSelectorPath -Force
+                } finally {
+                    Remove-Item $trackSelectorTmp -Force -ErrorAction SilentlyContinue
+                }
+            }
         }
-        $trackContent | Set-Content -Path $trackSelectorPath -NoNewline
     }
+} catch {
+    Write-Log "track-selector: patch failed, continuing anyway so state still gets saved - $($_.Exception.Message)"
 }
 
 # Added 2026-09-06: wrapped in try/catch. A run on 2026-09-06 12:20 checked every
