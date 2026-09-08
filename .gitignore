@@ -10,6 +10,7 @@ portable_config/cache/
 # Auto-generated logs/state (do not commit)
 portable_config/tools/update-log.txt
 portable_config/tools/update-state.json
+portable_config/track-selector-overrides.json
 
 # OS generated
 .DS_Store

@@ -1,3 +1,6 @@
 # Git LFS: large top-level shaders only (hdr-toys stays plain text, ~300 KB total)
 portable_config/shaders/*.glsl filter=lfs diff=lfs merge=lfs -text
 portable_config/shaders/*.hook filter=lfs diff=lfs merge=lfs -text
+* text=auto eol=lf
+updater.bat text eol=crlf
+doc/manual.pdf binary

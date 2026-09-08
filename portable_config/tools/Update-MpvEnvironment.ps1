@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-    Daily updater for mpv, hdr-toys, uosc, and thumbfast.
+    Daily updater for mpv, hdr-toys, uosc, thumbfast, and two anime-build scripts.
 .DESCRIPTION
-    Checks each of the four against its upstream source and only downloads
+    Checks each of the six against its upstream source and only downloads
     when something actually changed - safe to run on every login, since an
-    unchanged day is just four quick API calls and a log line.
+    unchanged day is just quick API calls and a log line.
 
     Never touches: mpv.conf, input.conf, script-opts\, or anything else in
     portable_config\ outside the paths listed in each Update-GitFolder call
@@ -42,7 +42,23 @@ $HdrShaderRoot = ((Join-Path $ConfigDir 'shaders\hdr-toys') -replace '\\', '/')
 $HdrToysRepo   = 'natural-harmonia-gropius/hdr-toys'              # matches the shaders already in shaders\hdr-toys\
 $UoscRepo      = 'tomasklaen/uosc'                                # upstream uosc (fork was stale, last push 2026-08-17)
 $ThumbfastRepo = 'po5/thumbfast'                                  # single file at the repo root - verified default branch below, 2026-08-19
+$AnimeBuildRepo = 'Chinna95P/mpv-anime-build'                     # vendored mpvSockets.lua + skip_intro.lua - branch 'main' (not $Branch)
+$AnimeBuildBranch = 'main'                                        # Chinna95P default branch; kept separate so $Branch ('master') stays untouched
 $Branch        = 'master'                                         # default branch for hdr-toys and thumbfast; uosc overrides via -RepoBranch 'main'
+
+# ===== AGENTS.md: Chinna95P/mpv-anime-build vendored scripts (Fix 3, 2026-09-07) =====
+# Syncs portable_config/scripts/utilities/mpvSockets.lua + portable_config/scripts/media/skip_intro.lua
+# from https://raw.githubusercontent.com/Chinna95P/mpv-anime-build/main/scripts/<name>, tracked by commit
+# SHA in update-state.json key 'animebuild' (backfilled with the other keys in Get-State).
+# Transforms mirror the hdr-toys jedypod precedent: mpvSockets.lua syncs VERBATIM except its provenance
+# comment ('-- Source: Chinna95P/mpv-anime-build (scripts/mpvSockets.lua)') is re-appended after download;
+# skip_intro.lua gets a FAIL-LOUD color-swap of the upstream label hexes (verified 2026-09-07 via curl:
+# Intro FF00FF->3f5a9c, OP 00FF00->abc2c9, PV 0099FF->48628a, ED FF8000->6a8faf)
+# plus a managed header.
+# Missing color block => warn + keep prior file, never half-write. Keywords are restructured/lowercased
+# local sets, functionally near-equivalent to upstream under case-insensitive match; they mirror
+# script-opts/uosc.conf chapter_range_patterns (openings/endings/outros/intros) - realign in uosc.conf,
+# not here. Per-component all-or-nothing + atomic temp-file replace; mutex/log rotation untouched.
 
 # ===== Setup =====
 New-Item -ItemType Directory -Force -Path $ToolsDir, $WorkDir | Out-Null   # ensure log/state/scratch folders exist
@@ -60,7 +76,7 @@ function Write-Log {
 
 function Get-State {
     # State = last-installed version/commit per component, so unchanged days do zero downloading.
-    $defaults = [pscustomobject]@{ mpv = ''; hdrtoys = ''; uosc = ''; thumbfast = '' }
+    $defaults = [pscustomobject]@{ mpv = ''; hdrtoys = ''; uosc = ''; thumbfast = ''; animebuild = '' }
     if (Test-Path $StateFile) {
         try {
             $loaded = Get-Content $StateFile -Raw | ConvertFrom-Json -ErrorAction Stop
@@ -70,6 +86,7 @@ function Get-State {
 
             # Copy only known scalar fields. This backfills older state files and avoids
             # trusting arbitrary JSON members when the file was edited or truncated.
+            # 'animebuild' (anime-build scripts, Fix 3) backfills here too when missing.
             foreach ($prop in $defaults.PSObject.Properties.Name) {
                 $value = $loaded.PSObject.Properties[$prop]
                 # Added 2026-09-06: on 2026-09-05 hdrtoys was found on disk as
@@ -214,20 +231,28 @@ function Update-GitFolder {
                 Copy-Item $src $dst -Recurse -Force -ErrorAction Stop
             } elseif ($p.Transforms) {
                 # Text transforms instead of a byte-for-byte copy (each: @{Find=...; Replace=...},
-                # applied in order). Added 2026-08-25, currently only used for hdr-toys.conf: one
-                # rule rewrites its ~~/ shader paths to a normalized path under this config root
+                # applied in order; optional Required=$true throws FAIL-LOUD when Find matches
+                # nothing, since -replace otherwise silently no-ops on a missing pattern).
+                # Added 2026-08-25 for hdr-toys.conf: one rule rewrites its ~~/ shader paths to a
+                # normalized path under this config root
                 # (~~/ is documented to sometimes not resolve correctly under a portable_config
                 # setup specifically), the other keeps jedypod over bottosson since upstream's own
                 # hdr-toys.conf hasn't caught up to its own v2504 release notes on that point.
                 # Optional Header field prepends a comment block after transforms (hdr-toys.conf).
                 New-Item -ItemType Directory -Force -Path (Split-Path $dst) | Out-Null
                 $text = Get-Content $src -Raw -ErrorAction Stop
-                foreach ($t in $p.Transforms) { $text = $text -replace $t.Find, $t.Replace }
+                foreach ($t in $p.Transforms) {
+                    if ($t.Required -and ([regex]::Matches($text, $t.Find).Count -eq 0)) {
+                        throw "transform pattern not found in $($p.Source): $($t.Find) - refusing to write $dst"
+                    }
+                    $text = $text -replace $t.Find, $t.Replace
+                }
                 if ($p.Header) { $text = $p.Header + $text }
                 $text | Set-Content -Path $dst -NoNewline -ErrorAction Stop
             } else {
                 New-Item -ItemType Directory -Force -Path (Split-Path $dst) | Out-Null
                 Copy-Item $src $dst -Force -ErrorAction Stop
+                if ($p.Header) { ($p.Header + (Get-Content $dst -Raw -ErrorAction Stop)) | Set-Content -Path $dst -NoNewline -ErrorAction Stop }
             }
         }
 
@@ -283,6 +308,21 @@ Update-GitFolder -Repo $UoscRepo -StateKey 'uosc' -RepoBranch 'main' -Paths @(
 # thumbfast: single file at the repo root, loaded by mpv as the top-level "thumbfast" script
 Update-GitFolder -Repo $ThumbfastRepo -StateKey 'thumbfast' -Paths @(
     @{ Source = 'thumbfast.lua'; Dest = 'scripts\thumbfast.lua'; IsDir = $false }
+)
+
+# AnimeBuild (Fix 3, 2026-09-07): mpvSockets.lua syncs verbatim except its provenance
+# header; skip_intro.lua gets the FAIL-LOUD NieR color-swap plus a managed header.
+Update-GitFolder -Repo $AnimeBuildRepo -StateKey 'animebuild' -RepoBranch $AnimeBuildBranch -Paths @(
+    @{ Source = 'scripts\mpvSockets.lua'; Dest = 'scripts\utilities\mpvSockets.lua'; IsDir = $false;
+       Header = "-- Source: Chinna95P/mpv-anime-build (scripts/mpvSockets.lua)`r`n" }
+    @{ Source = 'scripts\skip_intro.lua'; Dest = 'scripts\media\skip_intro.lua'; IsDir = $false;
+       Transforms = @(
+           @{ Find = 'FF00FF'; Replace = '3f5a9c'; Required = $true }
+           @{ Find = '00FF00'; Replace = 'abc2c9'; Required = $true }
+           @{ Find = '0099FF'; Replace = '48628a'; Required = $true }
+           @{ Find = 'FF8000'; Replace = '6a8faf'; Required = $true }
+       );
+       Header = "-- !!! AUTO-MANAGED by Update-MpvEnvironment.ps1 !!!`r`n-- Synced from upstream Chinna95P/mpv-anime-build (scripts/skip_intro.lua) with local NieR palette; manual edits will be LOST.`r`n" }
 )
 
 # Added 2026-09-06: wrapped in try/catch. A run on 2026-09-06 12:20 checked every

@@ -11,10 +11,12 @@
 ```
 C:\mpv\
 ├── portable_config/              # mpv portable expects EXACTLY this name — never rename
-│   ├── mpv.conf                  # Main config — 141 lines (video/audio/output, profiles)
+│   ├── mpv.conf                  # Main config — 158 lines (faithful + SSim + fruit/rgba16hf) (video/audio/output, profiles)
 │   ├── hdr-toys.conf             # HDR profiles — 59 lines, AUTO-MANAGED, do not edit directly
-│   ├── input.conf                # Keybindings — 51 lines (custom only; uosc/mpv defaults handle rest)
+│   ├── input.conf                # Keybindings — 70 lines (custom only; uosc/mpv defaults handle rest)
 │   ├── scripts/
+│   │   ├── auto-save-state.lua   # Watch-later persist every 1s (Ulysses) — 2,386 bytes (vendored)
+│   │   ├── track-selector.lua    # Commentary-safe select v3.5 (Chinna95P, es dub patch) — 31,319 bytes
 │   │   ├── thumbfast.lua         # Timeline thumbnails (po5/thumbfast) — 32,495 bytes
 │   │   ├── uosc/                 # Modern UI (tomasklaen/uosc) — main.lua 43 KB + 40+ modules
 │   │   │   ├── main.lua          # Entry (43,470 bytes)
@@ -22,17 +24,21 @@ C:\mpv\
 │   │   │   ├── lib/              # ass, cursor, std, utils, text, menus etc. (10 files)
 │   │   │   ├── intl/             # 10 locales (de, es, fr, it, pl, pt, ro, ru, tr, uk, zh*)
 │   │   │   └── char-conv/        # zh.json (85 KB)
-│   │   ├── media/
-│   │   │   ├── sub-select.lua    # Smart subs (CogentRedTester) — 14,940 bytes
-│   │   │   └── skip_intro.lua    # Intro skip (Chinna95P) — 6,123 bytes
+│   │   ├── media/                # 6 files: bundle loader + 5 handlers (sub-select DISABLED)
+│   │   │   ├── main.lua          # Shim — 973 bytes → requires skip_intro, betterchapters, fix-sub-timing, Up_Next (sub-select disabled)
+│   │   │   ├── skip_intro.lua    # Intro/OP/ED skip (Chinna95P) — 8,536 bytes
+│   │   │   ├── sub-select.lua    # Smart subs (CogentRedTester) — 14,940 bytes — DISABLED, superseded by track-selector.lua
+│   │   │   ├── betterchapters.lua # Chapter Next/Prev with playlist fallback — 973 bytes
+│   │   │   ├── fix-sub-timing.lua # Two-point drift correction — 2,300 bytes
+│   │   │   └── Up_Next.lua       # End-of-file next-episode card — 10,700 bytes
 │   │   ├── display/
-│   │   │   └── change-refresh.lua # Refresh-rate switching (22,107 bytes) → tools/Set-RefreshRate.ps1
+│   │   │   └── change-refresh.lua # Refresh-rate switching (22,885 bytes) → tools/Set-RefreshRate.ps1
 │   │   ├── utilities/
 │   │   │   ├── autocrop.lua      # Auto crop (kevmitch) — 9,268 bytes
 │   │   │   ├── autodeint.lua     # Auto deinterlace — 5,862 bytes
-│   │   │   └── mpvSockets.lua    # IPC named pipe per PID — 1,373 bytes (NOT a shim)
+│   │   │   └── mpvSockets.lua    # IPC named pipe per PID — 2,478 bytes (NOT a shim)
 │   │   ├── display/main.lua      # Shim — 116 bytes → require './change-refresh'
-│   │   ├── media/main.lua        # Shim — 232 bytes → require skip_intro/sub-select
+│   │   ├── media/main.lua        # (see media/ main.lua above — not separate shim, now 973 bytes with 5 requires)
 │   │   └── utilities/main.lua    # Shim — 208 bytes → require autocrop/autodeint/mpvSockets
 │   ├── script-opts/
 │   │   ├── uosc.conf             # 102 lines — NieR:Automata theme, floating bar
@@ -47,16 +53,18 @@ C:\mpv\
 │   │   │   ├── transfer-function/# 10 files: pq, hlg, bt1886, bt709, srgb (+ _inv)
 │   │   │   │   └── log/          # 42 files: apple_log, arri_logc3/4, canon_clog2/3, sony_slog2/3, etc.
 │   │   │   └── utils/            # 13 files: clip_both/black/alpha/white, exposure, lut, etc.
+│   │   ├── SSimSuperRes.glsl     # Anti-ringing upscale (Shiandow) — 5,965 bytes
+│   │   ├── SSimDownscaler.glsl   # Anti-ringing downscale (Shiandow) — 5,656 bytes
 │   │   ├── ArtCNN_C4F32.glsl     # AI upscale — Git LFS 131-byte pointer (real ~761 KB)
 │   │   ├── CfL_Prediction.glsl   # Chroma reconstruction — Git LFS 130-byte pointer
 │   │   ├── nlmeans.glsl          # Denoise (opt-in Alt+n) — Git LFS 130-byte pointer
-│   │   └── ravu-zoom-ar-r3.hook  # Adaptive upscale — Git LFS 132-byte pointer
+│   │   └── ravu-zoom-ar-r4.hook  # Adaptive upscale — Git LFS 132-byte pointer
 │   ├── fonts/
 │   │   ├── uosc_icons.ttf        # 1,206,668 bytes
 │   │   ├── uosc_icons.otf        # 400,360 bytes
 │   │   └── uosc_textures.ttf     # 38,228 bytes
 │   ├── tools/
-│   │   ├── Update-MpvEnvironment.ps1    # 324 lines — daily updater (mpv+hdr-toys+uosc+thumbfast)
+│   │   ├── Update-MpvEnvironment.ps1    # 364 lines — daily updater (mpv+hdr-toys+uosc+thumbfast+animebuild)
 │   │   ├── Register-MpvAutoupdate.ps1   # 27 lines — one-time Scheduled Task registration
 │   │   ├── Set-RefreshRate.ps1          # 124 lines — Win32 ChangeDisplaySettingsEx wrapper
 │   │   ├── update-state.json            # Last installed versions — DO NOT COMMIT
@@ -74,12 +82,12 @@ C:\mpv\
 ├── mpv.exe                       # 122,371,072 bytes — DO NOT COMMIT (managed by updater)
 ├── mpv.com                       # 3,584 bytes — console stub — DO NOT COMMIT
 ├── settings.xml                  # 8 lines — updater settings (arch, autodelete, getffmpeg, ytdlp channel, token)
-├── updater.bat                   # entry point → portable_config/tools/Update-MpvEnvironment.ps1
+├── updater.bat                   # 24 lines — wrapper (installer/updater.ps1 fallback; preferred is portable_config/tools/Update-MpvEnvironment.ps1)
 ├── mpv-register.bat              # 6 lines — calls `mpv --register` (file association)
 ├── mpv-unregister.bat            # 6 lines — calls `mpv --unregister`
-├── .gitignore                    # 22 lines — ignores mpv.exe/com, cache/, update-state/log
+├── .gitignore                    # 23 lines — ignores mpv.exe/com, cache/, update-state/log, track-selector-overrides.json
 ├── .gitattributes                # 3 lines — Git LFS tracking for *.glsl/*.hook
-└── README.md                     # 134 lines — public overview
+└── README.md                     # 109 lines — public overview
 ```
 
 **Critical:** `portable_config/` must stay exactly that name (mpv portable hard-requires it). No `C:\mpv\shaders\` at root — all shaders live under `portable_config/shaders/`. Legacy docs may reference root `shaders/` — ignore.
@@ -96,9 +104,9 @@ C:\mpv\
 
 ### 2.2 Never Commit Cache / State / Logs
 - **NEVER** commit `portable_config/cache/` — `.gitignore:8` (shader cache + watch_later, auto-generated). Currently `shaders_cache/` holds ~350 files, `watch_later/` 0 files.
-- **NEVER** commit `portable_config/tools/update-log.txt` or `update-state.json` — `.gitignore:10-11`
+- **NEVER** commit `portable_config/tools/update-log.txt` or `update-state.json` — `.gitignore:11-12` (+ `track-selector-overrides.json:13`)
 - Auto-cleanup in `portable_config/tools/Update-MpvEnvironment.ps1:288-315`: shader cache `>30d`, watch_later `>7d`, log rotation at `>500` lines (keeps last 400)
-- `update-state.json:1` example: `{"mpv":"2026-08-31-02a595ddc1","hdrtoys":"78aa356...","uosc":"12b918f...","thumbfast":"0f711de..."}` — 4 SHAs/tags, one per component (`Update-MpvEnvironment.ps1:63`)
+- `update-state.json:1` example: `{"mpv":"2026-08-31-02a595ddc1","hdrtoys":"78aa356...","uosc":"12b918f...","thumbfast":"0f711de...","animebuild":"..."}` — 5 SHAs/tags, one per component (`Update-MpvEnvironment.ps1:63`)
 
 ### 2.3 Never Edit Auto-Managed Files
 - **NEVER** edit `portable_config/hdr-toys.conf` directly — header `hdr-toys.conf:1` says `AUTO-MANAGED by Update-MpvEnvironment.ps1` — will be overwritten on next daily run.
@@ -109,47 +117,47 @@ C:\mpv\
 ### 2.4 Preserve Portable Structure
 - Don't rename `portable_config/` — mpv portable hard-requires this name
 - Don't remove `updater.bat`, `installer/updater.ps1`, `mpv-register.bat`, `mpv-unregister.bat`
-- Keep absolute paths `C:/mpv/...` in `mpv.conf:31`, `input.conf:35-36,44` and shader appends — `~~/` is documented to sometimes fail under `portable_config` (see `Update-MpvEnvironment.ps1:40,271` and `mpv.conf:31`). Only `mpv.conf:61-62` keeps `~~/` for cache dirs (the sole place it is known safe)
-- Shim files (`display/main.lua:1`, `media/main.lua:1`, `utilities/main.lua:1`) are `require` re-exports — keep them, they bundle scripts per-folder. `utilities/mpvSockets.lua:1` is NOT a shim — it sets `input-ipc-server` to `\\.\pipe\mpvSockets_<PID>` on Windows
+- Keep absolute paths `C:/mpv/...` in `mpv.conf:34`, `input.conf:54-55,63` and shader appends — `~~/` is documented to sometimes fail under `portable_config` (see `Update-MpvEnvironment.ps1:40,271` and `mpv.conf:34`). Only `mpv.conf:64-65` keeps `~~/` for cache dirs (the sole place it is known safe)
+- Shim files (`display/main.lua:1`, `utilities/main.lua:1`) are `require` re-exports — keep them, they bundle scripts per-folder. `media/main.lua:1` is now a 973-byte bundle loader (not a 1-line shim) requiring 5 handlers. `utilities/mpvSockets.lua:1` is NOT a shim — it sets `input-ipc-server` to `\\\\.\\pipe\\mpvSockets_<PID>` on Windows
 
 ### 2.5 Git LFS
-- `portable_config/shaders/*.glsl` and `*.hook` at top level are tracked via LFS — `.gitattributes:2-3` — only 4 files: `ArtCNN_C4F32.glsl` (131b pointer), `CfL_Prediction.glsl` (130b), `nlmeans.glsl` (130b), `ravu-zoom-ar-r3.hook` (132b). Real sizes ~761 KB, ~100s KB respectively when pulled.
-- **`hdr-toys/` stays plain text** — 77 files, 298 KB total — do NOT LFS it. Only those 4 top-level shaders use LFS.
-- Without `git lfs install`, those 4 files read as `version https://git-lfs.github.com/spec/v1` pointer text — `portable_config/shaders/*.glsl:1` will show pointer, not shader code. Before cloning/pulling LFS: `git lfs install` then `git lfs pull`
+- `portable_config/shaders/*.glsl` and `*.hook` at top level are tracked via LFS — `.gitattributes:2-3` — only 6 files: `ArtCNN_C4F32.glsl`, `SSimSuperRes.glsl`, `SSimDownscaler.glsl` (131b pointer), `CfL_Prediction.glsl` (130b), `nlmeans.glsl` (130b), `ravu-zoom-ar-r4.hook` (132b). Real sizes ~761 KB, ~100s KB respectively when pulled.
+- **`hdr-toys/` stays plain text** — 77 files, 298 KB total — do NOT LFS it. Only those 6 top-level shaders use LFS (4 original + 2 SSim).
+- Without `git lfs install`, those 6 files read as `version https://git-lfs.github.com/spec/v1` pointer text — `portable_config/shaders/*.glsl:1` will show pointer, not shader code. Before cloning/pulling LFS: `git lfs install` then `git lfs pull`
 - Never `git add` a pointer file — ensure `git lfs ls-files` shows them as LFS objects
 
 ---
 
 ## 3. KEY FILES — Deep Reference
 
-### 3.1 `portable_config/mpv.conf` — 141 lines
-**Global (lines 1-67):**
+### 3.1 `portable_config/mpv.conf` — 158 lines
+**Global (lines 1-69):**
 - `vo=gpu-next`, `gpu-api=vulkan`, `hwdec=auto-safe`, `vd-lavc-dr=yes`, `hwdec-extra-frames=10` — modern pipeline, RTX 5080 verified (`mpv.conf:5-9`)
 - `profile=high-quality`, `vulkan-async-compute/transfer=yes`, `vulkan-queue-count=1` — tested 1/2/3 all 0 drops (`mpv.conf:10-13`)
 - `video-sync=display-vdrop` (`mpv.conf:14`) — UI responsiveness without audio pitch shift
-- Downscaling: `dscale=hermite` globally (`mpv.conf:17`), `ewa_lanczos` only inside `[Res-Downscale]` (`mpv.conf:104-105`), `linear-downscaling=yes` (`mpv.conf:18`, disabled for downscale `mpv.conf:104`), `correct-downscaling=yes` (`mpv.conf:19`), `sigmoid-upscaling=yes` (`mpv.conf:20`)
+- Downscaling: `dscale=hermite` globally (`mpv.conf:17`), `ewa_lanczos` only inside `[Res-Downscale]` (`mpv.conf:118`), `linear-downscaling=yes` (`mpv.conf:18`, disabled for downscale `mpv.conf:117`), `correct-downscaling=yes` (`mpv.conf:19`), `sigmoid-upscaling=yes` (`mpv.conf:20`)
 - Antiringing `scale-antiring=0.7` (`mpv.conf:23`)
-- Deband: `deband=yes`, `dither-depth=auto`, `temporal-dither=yes` (`mpv.conf:26-28`) — toggle via `Alt+d` in `input.conf:22`
-- HDR: `include="C:/mpv/portable_config/hdr-toys.conf"` (`mpv.conf:31`) — loads before profiles; must stay before any `[profile]`
-- Subs/audio: `sub-auto=fuzzy`, `sub-ass-override=no`, `sub-ass-style-overrides=Kerning=yes`, `sub-ass-scale-with-window=no`, `demuxer-mkv-subtitle-preroll=yes`, `slang=es,es-ES,es-419,en,eng,jpn,ja,und`, `alang=jpn,ja,eng,en`, `audio-normalize-downmix=yes` (`mpv.conf:34-41`)
-- Screenshots: `png`, `screenshot-high-bit-depth=yes`, `screenshot-tag-colorspace=yes`, to `C:/Users/Anxo/Pictures/mpv` (`mpv.conf:44-47`)
-- Behavior: `keep-open=yes`, `save-position-on-quit=yes`, `force-window=immediate`, `reset-on-next-file=audio-delay,sub-delay,video-aspect-override,video-pan-x,video-pan-y,video-rotate,video-zoom,volume,hue,vf,af`, `cursor-autohide=3000`, `fs=yes` (`mpv.conf:50-55`)
-- Auto-playlist: `autocreate-playlist=filter` (`mpv.conf:58`) — auto-queues folder episodes
-- Cache dirs: `gpu-shader-cache-dir="~~/cache/shaders_cache"`, `watch-later-dir="~~/cache/watch_later"` (`mpv.conf:61-62`) — only place `~~/` is kept
-- uosc: `border=no`, `osd-bar=no` (`mpv.conf:65-66`) — uosc draws its own
+- Deband: `deband=yes`, `dither-depth=auto`, `dither=fruit` (`mpv.conf:28`), `temporal-dither=yes` + `temporal-dither-period=1` (`mpv.conf:29-30`), `fbo-format=rgba16hf` (`mpv.conf:31`, 16-bit float) — toggle via `Alt+d` in `input.conf:41`
+- HDR: `include="C:/mpv/portable_config/hdr-toys.conf"` (`mpv.conf:34`) — loads before profiles; must stay before any `[profile]`
+- Subs/audio: `sub-auto=fuzzy`, `sub-ass-override=no`, `sub-ass-style-overrides=Kerning=yes`, `sub-ass-scale-with-window=no`, `demuxer-mkv-subtitle-preroll=yes`, `slang=es,es-ES,es-419,en,eng,jpn,ja,und`, `alang=jpn,ja,eng,en`, `audio-normalize-downmix=yes` (`mpv.conf:37-44`)
+- Screenshots: `png`, `screenshot-high-bit-depth=yes`, `screenshot-tag-colorspace=yes`, to `C:/Users/Anxo/Pictures/mpv` (`mpv.conf:47-50`)
+- Behavior: `keep-open=yes`, `save-position-on-quit=yes`, `force-window=immediate`, `reset-on-next-file=audio-delay,sub-delay,video-aspect-override,video-pan-x,video-pan-y,video-rotate,video-zoom,volume,hue,vf,af`, `cursor-autohide=3000`, `fs=yes` (`mpv.conf:53-58`)
+- Auto-playlist: `autocreate-playlist=filter` (`mpv.conf:61`) — auto-queues folder episodes
+- Cache dirs: `gpu-shader-cache-dir="~~/cache/shaders_cache"`, `watch-later-dir="~~/cache/watch_later"` (`mpv.conf:64-65`) — only place `~~/` is kept
+- uosc: `border=no`, `osd-bar=no` (`mpv.conf:68-69`) — uosc draws its own
 
-**Profiles (lines 68-141) — order matters, `profile-restore=copy` isolates each:**
+**Profiles (lines 70-156) — order matters, `profile-restore=copy` isolates each:**
 | Profile | Condition (`profile-cond`) | Shaders / Overrides | Notes |
 |---------|----------------------------|---------------------|-------|
-| `[Res-SD]` | `height~=nil and height<700` | `ravu-zoom + CfL` | SD/DVD |
-| `[Res-720p-Clean2x]` | `700≤h<740` | `ArtCNN + CfL` | Exact 2× to 1440p — integer scale has no ringing |
-| `[Res-Fractional]` | `740≤h<1340` | `ravu-zoom + CfL` | 1080p etc. — fractional scaling |
-| `[Res-NearNative]` | `1340≤h<1440` | `CfL` only | Near 1440p — no upscaler needed |
-| `[Res-Downscale]` | `h≥1440` | `CfL` + `dscale=ewa_lanczos` + `linear-downscaling=no` | Downscale profile overrides global dscale |
+| `[Res-SD]` | `height~=nil and height<700` | `ravu-zoom + CfL + SSimSuperRes + SSimDownscaler` | SD/DVD + SSim |
+| `[Res-720p-Clean2x]` | `700≤h<740` | `ArtCNN + CfL + SSimSuperRes + SSimDownscaler` | Exact 2× to 1440p + SSim |
+| `[Res-Fractional]` | `740≤h<1340` | `ravu-zoom + CfL + SSimSuperRes + SSimDownscaler` | 1080p etc. + SSim |
+| `[Res-NearNative]` | `1340≤h<1440` | `CfL + SSimSuperRes + SSimDownscaler` | Near 1440p + SSim |
+| `[Res-Downscale]` | `h≥1440` | `CfL + SSimSuperRes + SSimDownscaler` + `dscale=ewa_lanczos` + `linear-downscaling=no` | Downscale + SSimDownscaler |
 | `[Colorspace-BT709]` | `p["video-params/primaries"]=="bt.709" and p["video-params/gamma"]~="pq/hlg"` (negated) | `target-prim=bt.709, target-trc=bt.1886` | Modern SDR |
 | `[Colorspace-NTSC]` | `bt.601-525` | `bt.601-525` | Pre-2000s NTSC |
 | `[Colorspace-PAL]` | `bt.601-625` | `bt.601-625` | Euro PAL |
-| `[gray]` | `p["video-params/pixelformat"]=="gray"` | *removes* CfL/ArtCNN/ravu, `dscale=gaussian` | B&W — skips chroma reconstruction |
+| `[gray]` | `p["video-params/pixelformat"]=="gray"` | *removes* CfL/ArtCNN/ravu/SSim, `dscale=gaussian` | B&W — skips chroma reconstruction |
 | `[ending]` | `get("duration",0)>0 and get("time-remaining",0)<=60` | `save-position-on-quit=no` | Final 60s - do not save position |
 
 - All profiles use `profile-restore=copy` so changes don't leak to next file. Never remove it.
@@ -164,19 +172,21 @@ Generated by `Update-MpvEnvironment.ps1:267-275` from upstream `natural-harmonia
 - `[bt.2100-hlg]` (`hdr-toys.conf:23-32`) — `bt.2020+hlg` → `clip_both + hlg_inv + astra + jedypod + bt1886`
 - `[bt.2020]` (`hdr-toys.conf:34-41`) — `bt.2020+bt.1886` → `bt1886_inv + jedypod + bt1886`
 - `[linear]` (`hdr-toys.conf:43-58`) — `exr/hdr/tiff pipe` → `vf=format:gamma=linear`, `deband=no`, `scale=bilinear`, `target-prim=bt.2020 target-trc=linear`, plus `clip_black + clip_alpha + astra + jedypod + bt1886`, opts `spatial_stable_iterations=0 temporal_stable_duration=0 enable_metering=1`
-- All use absolute `C:/mpv/...` after transform. `Alt+h` in `input.conf:44` must del **all 9** shaders across these 4 profiles to fully disable — fixed 2026-08-25 (was only 5 PQ shaders before).
+- All use absolute `C:/mpv/...` after transform. `Alt+h` in `input.conf:63` must del **all 9** shaders across these 4 profiles to fully disable — fixed 2026-08-25 (was only 5 PQ shaders before).
 
-### 3.3 `portable_config/input.conf` — 51 lines
+### 3.3 `portable_config/input.conf` — 70 lines
 Custom bindings only — everything else uses mpv/uosc defaults. `#!` syntax builds uosc right-click menu; without `MBTN_RIGHT` binding menu is empty.
 
 - `MBTN_RIGHT` + `MENU` → `script-binding uosc/menu` (`input.conf:10-11`) — **required** for `#!` menu comments to attach. Do not remove either.
+- `z` / `Z` → `script-binding media/chapter_next/prev` (`input.conf:19-20`) — playlist-aware chapter navigation (betterchapters vendored, `#!` Chapters > Next/Previous) — falls through to playlist-next/prev at chapter ends.
+- `Ctrl+z` / `Ctrl+x` / `Ctrl+/` → `sub-step` + `script-binding media/sub-set-time` (`input.conf:32-34`) — two-point drift correction (fix-sub-timing): step early/late and mark sync points for sub-delay/sub-speed solver.
 - `#  script-binding uosc/subtitles/audio/chapters/open-file` (`input.conf:12-15`) — menu-only entries, no key, appear as `Subtitles / Audio tracks / Chapters / Open file` in right-click.
-- `Ctrl+Shift+s` → `no-osd set screenshot-sw yes; screenshot; set screenshot-sw no` (`input.conf:17`) — raw source-frame (pre-OSD) screenshot. Menu: `Diagnostics > Screenshot (raw source frame)`.
-- `Alt+d` → `cycle-values deband "yes"/"no"` (`input.conf:22`) — toggle mpv built-in deband. Menu: `Diagnostics > Deband toggle`.
-- `Alt+g` → `set deband-iterations 2; set deband-threshold 35; set deband-range 16; set deband-grain 4` (`input.conf:28`) — classicjazz tuning `2:35:16:4` — **rejected** (bare defaults scored 2.99 vs 25.57 banding), **not in menu**, reload file to reset. Kept for re-testing only.
-- `Alt+n` / `Alt+Shift+n` → `change-list glsl-shaders pre/del nlmeans.glsl` (`input.conf:35-36`) — `pre` to run before upscaler chain (denoise must precede upscale). Menu: `Diagnostics > Denoise > On/Off`. Benefit confirmed SSIM 0.57→0.82 on synthetic noise, but opt-in only.
-- `Alt+h` (`input.conf:44`) → del all 9 hdr-toys shaders + `set target-colorspace-hint yes; set tone-mapping spline; set gamut-mapping-mode auto` — manual fallback to native tone-mapping. Menu: `Diagnostics > HDR (use native tone-mapping)`. Lists all 9 even if some not loaded — `del` on non-loaded shader is harmless no-op. Reload file to restore hdr-toys.
-- `Alt+t` → `cycle-values tone-mapping "spline"/"bt.2446a"` (`input.conf:51`) — unresolved HDR test (only visible on HDR like Dolby Vision remux). Not in menu, kept for comparison.
+- `Ctrl+Shift+s` → `no-osd set screenshot-sw yes; screenshot; set screenshot-sw no` (`input.conf:36`) — raw source-frame (pre-OSD) screenshot. Menu: `Diagnostics > Screenshot (raw source frame)`.
+- `Alt+d` → `cycle-values deband "yes"/"no"` (`input.conf:41`) — toggle mpv built-in deband. Menu: `Diagnostics > Deband toggle`.
+- `Alt+g` → `set deband-iterations 2; set deband-threshold 35; set deband-range 16; set deband-grain 4` (`input.conf:47`) — classicjazz tuning `2:35:16:4` — **rejected** (bare defaults scored 2.99 vs 25.57 banding), **not in menu**, reload file to reset. Kept for re-testing only.
+- `Alt+n` / `Alt+Shift+n` → `change-list glsl-shaders pre/del nlmeans.glsl` (`input.conf:54-55`) — `pre` to run before upscaler chain (denoise must precede upscale). Menu: `Diagnostics > Denoise > On/Off`. Benefit confirmed SSIM 0.57→0.82 on synthetic noise, but opt-in only.
+- `Alt+h` (`input.conf:63`) → del all 9 hdr-toys shaders + `set target-colorspace-hint yes; set tone-mapping spline; set gamut-mapping-mode auto` — manual fallback to native tone-mapping. Menu: `Diagnostics > HDR (use native tone-mapping)`. Lists all 9 even if some not loaded — `del` on non-loaded shader is harmless no-op. Reload file to restore hdr-toys.
+- `Alt+t` → `cycle-values tone-mapping "spline"/"bt.2446a"` (`input.conf:70`) — unresolved HDR test (only visible on HDR like Dolby Vision remux). Not in menu, kept for comparison.
 - Inline comments document rationale inline — preserve them if editing.
 
 ### 3.4 `portable_config/script-opts/`
@@ -198,7 +208,7 @@ Custom bindings only — everything else uses mpv/uosc defaults. `#!` syntax bui
 Used by `installer/updater.ps1:79` (`Get-GitHubToken` checks `settings.xml` → `GH_TOKEN` → `GITHUB_TOKEN` env). Also controls arch selection for mpv/ffmpeg asset regex.
 
 ### 3.6 `portable_config/shaders/` and `portable_config/scripts/` — Detailed
-- **Shaders:** `hdr-toys/` 77 files, 298 KB plain text (see tree breakdown above). 4 top-level LFS pointers until `git lfs pull`: `ArtCNN_C4F32.glsl:1` shows `version https://git-lfs.github.com/spec/v1` (131 bytes), similarly CfL/nlmeans 130 bytes, ravu 132 bytes. Real files are binary-ish GLSL hooks, never hand-edit `hdr-toys/` — will be overwritten by `Update-MpvEnvironment.ps1:268`.
+- **Shaders:** `hdr-toys/` 77 files, 298 KB plain text (see tree breakdown above). 6 top-level LFS pointers until `git lfs pull`: `ArtCNN_C4F32.glsl:1` shows `version https://git-lfs.github.com/spec/v1` (131 bytes), similarly CfL/nlmeans/SSim 130-131 bytes, ravu 132 bytes. Real files are GLSL hooks, never hand-edit `hdr-toys/` — will be overwritten by `Update-MpvEnvironment.ps1:268`.
 - **Scripts:** `uosc/main.lua` 43 KB + 40+ modules (elements/, lib/, intl/, char-conv/); top-level `portable_config/scripts/thumbfast.lua` 32 KB (po5), `sub-select.lua` 14 KB (CogentRedTester), `skip_intro.lua` 6 KB (Chinna95P); `display/change-refresh.lua` 22 KB (custom, base CogentRedTester + Set-RefreshRate.ps1 integration); `utilities/autocrop.lua` 9 KB (kevmitch), `autodeint.lua` 5 KB (mpv upstream). Loader shims are 116–209 byte `require` re-exports; `utilities/mpvSockets.lua` is 1,373 bytes full IPC logic (`mp.set_property("input-ipc-server", "\\\\.\\pipe\\mpvSockets_<pid>")` on Windows, `/tmp/mpvSockets/...sock` on unix). The three `main.lua` shims bundle per-folder so mpv's recursive loader groups them.
 - **thumbfast path:** Upstream `po5/thumbfast` is installed at `portable_config/scripts/thumbfast.lua` at the top level of `scripts/`. `Update-MpvEnvironment.ps1:285` writes `Dest='scripts\\thumbfast.lua'`; mpv discovers the script directly, and `media/main.lua` does not require it.
 
@@ -219,12 +229,12 @@ Two updaters coexist — **don't confuse them**:
 
 | Tool | Purpose | When to run | Touches |
 |------|---------|-------------|---------|
-| `updater.bat` → `portable_config/tools/Update-MpvEnvironment.ps1` (324 lines) | **Preferred** mpv + hdr-toys + uosc + thumbfast | Manual run (same script the login task uses) | `mpv.exe`, `shaders/hdr-toys/`, `scripts/uosc/`, `fonts/`, `scripts/thumbfast.lua`, `hdr-toys.conf` |
+| `updater.bat` → `installer/updater.ps1` (796 lines) + fallback | **Legacy/full** mpv + yt-dlp/ffmpeg | Manual | `mpv.exe`, `yt-dlp.exe`, `ffmpeg.exe` | (preferred daily is `portable_config/tools/Update-MpvEnvironment.ps1` 364 lines) |
 | `installer/updater.ps1` (796 lines, invoke directly) | **Legacy/full** mpv + yt-dlp/youtube-dl + ffmpeg + deno | Manual, interactive, 9s prompts | `mpv.exe`, `yt-dlp.exe`, `ffmpeg.exe`, `deno.exe`, `settings.xml` |
-| `portable_config/tools/Update-MpvEnvironment.ps1` (324 lines) | **Daily preferred** mpv + hdr-toys + uosc + thumbfast | Every login (Scheduled Task) | `mpv.exe`, `shaders/hdr-toys/`, `scripts/uosc/`, `fonts/`, `scripts/thumbfast.lua`, `hdr-toys.conf` |
+| `portable_config/tools/Update-MpvEnvironment.ps1` (364 lines) | **Daily preferred** mpv + hdr-toys + uosc + thumbfast + animebuild | Every login (Scheduled Task) | `mpv.exe`, `shaders/hdr-toys/`, `scripts/uosc/`, `fonts/`, `scripts/thumbfast.lua`, `hdr-toys.conf`, `scripts/utilities/mpvSockets.lua`, `scripts/media/skip_intro.lua` |
 
 ### 4.1 `updater.bat`
-Thin wrapper: `pushd %~dp0`, detects `pwsh` vs `powershell` (`where pwsh`), runs `portable_config/tools/Update-MpvEnvironment.ps1` with `Bypass`, `timeout 5`. Always use this as entry point for component updates, not calling the ps1 directly. For the legacy yt-dlp/ffmpeg workflow, invoke `installer/updater.ps1` directly.
+Thin wrapper: `pushd %~dp0`, detects `pwsh` vs `powershell` (`where pwsh`), runs `installer/updater.ps1` (or `updater.ps1` fallback) with `Bypass`, `timeout 5` and cleans stray `updater.ps1`. For the preferred daily component update (mpv+hdr-toys+uosc+thumbfast+animebuild), call `portable_config/tools/Update-MpvEnvironment.ps1` directly; for legacy yt-dlp/ffmpeg workflow, invoke `installer/updater.ps1` directly.
 
 ### 4.2 `installer/updater.ps1` — 796 lines — Legacy updater
 - Source: `zhongfly/mpv-winbuild` releases (configurable via `settings.xml:arch`, or `shinchiro/mpv-winbuild-cmake` alternative comment `Update-MpvEnvironment.ps1:22-25`)
@@ -234,11 +244,11 @@ Thin wrapper: `pushd %~dp0`, detects `pwsh` vs `powershell` (`where pwsh`), runs
 - Persists choices to `settings.xml`: arch (x86_64 vs x86_64-v3), autodelete, getffmpeg, getytdl (ytdlp/youtubedl/false), ytdlpchannel, githubtoken
 - Handles 32-bit detection via `SysWow64` test, Deno only on x86_64 Windows
 
-### 4.3 `portable_config/tools/Update-MpvEnvironment.ps1` — 324 lines — Daily updater (preferred)
+### 4.3 `portable_config/tools/Update-MpvEnvironment.ps1` — 364 lines — Daily updater (preferred)
 - **Does:** mpv (x86_64-v3 asset only) + hdr-toys + uosc + thumbfast. Safe to run every login — unchanged day = 4 API calls, no downloads, just log line.
 - **Never touches:** `mpv.conf`, `input.conf`, `script-opts/` — only paths in `Update-GitFolder` calls (`tools/Update-MpvEnvironment.ps1:267-286`): `shaders/hdr-toys` dir, `hdr-toys.conf` (with transforms), `scripts/uosc` dir + fonts, `scripts/thumbfast.lua`
 - Config: `MpvRepo='zhongfly/mpv-winbuild'` (`Update-MpvEnvironment.ps1:26`), `MpvRoot='C:\mpv'`, `ConfigDir`, `ToolsDir`, `StateFile='tools/update-state.json'`, `LogFile='tools/update-log.txt'`, `WorkDir=$env:TEMP\mpv-autoupdate`
-- State in `tools/update-state.json:1` (`mpv`, `hdrtoys`, `uosc`, `thumbfast` SHAs/tags) — skips download if SHA matches previous run. Backfills missing keys for older state files (`Update-MpvEnvironment.ps1:73-83`)
+- State in `tools/update-state.json:1` (`mpv`, `hdrtoys`, `uosc`, `thumbfast`, `animebuild` SHAs/tags) — skips download if SHA matches previous run. Backfills missing keys for older state files (`Update-MpvEnvironment.ps1:73-83`)
 - mpv: `https://api.github.com/repos/$MpvRepo/releases/latest` → regex `^mpv-x86_64-v3-\d{8}-git-[0-9a-f]+\.7z$` (`Update-MpvEnvironment.ps1:124-126`) — if no v3 asset (seen 2026-08-27 release `2026-08-26-182fa6ca49`), **waits** rather than falling back to baseline (`Update-MpvEnvironment.ps1:127-134`): `Write-Log "no matching x86_64 asset ... skipping"`
 - hdr-toys/uosc/thumbfast: `https://api.github.com/repos/<repo>/commits/<branch>` (`Update-MpvEnvironment.ps1:182`) → zip via `codeload.github.com/$Repo/zip/$sha` (`Update-MpvEnvironment.ps1:199`) → `Expand-Archive` → copy per `Paths` table. hdr-toys includes 2 text transforms. uosc uses `-RepoBranch 'main'` (others use `master` `Update-MpvEnvironment.ps1:45`)
 - Requires 7-Zip on PATH or `ProgramFiles\7-Zip\7z.exe` for mpv step only (`Update-MpvEnvironment.ps1:136-145`) — if missing, logs and skips mpv, continues to hdr-toys/uosc (they need only `Expand-Archive`)
@@ -258,14 +268,14 @@ Win32 `ChangeDisplaySettingsEx` via `Add-Type` C# `DisplayHelper` (`Set-RefreshR
 
 ### 5.1 Before Any Edit — Checklist
 1. Read the file you're editing + this `AGENTS.md` + `README.md:1` + `.gitignore:1` + `.gitattributes:1`
-2. Check `hdr-toys.conf:1` header if touching HDR — likely need to edit `mpv.conf:31` or `Update-MpvEnvironment.ps1:267-275` instead
+2. Check `hdr-toys.conf:1` header if touching HDR — likely need to edit `mpv.conf:34` or `Update-MpvEnvironment.ps1:267-275` instead
 3. Run `git status` — verify `portable_config/cache/`, `portable_config/tools/update-state.json`, `update-log.txt`, `mpv.exe`, `mpv.com` are NOT staged (all ignored). Never `git add -A` without checking.
 4. Check `git lfs ls-files` if touching `portable_config/shaders/*.glsl` — ensure pointers not committed
 5. Note hardware context (RTX 5080, Vulkan, 1440p) — don't break `vo=gpu-next` + `gpu-api=vulkan` for "generic" advice
 
 ### 5.2 Editing Configs Safely
-- **mpv.conf:** Keep `profile-restore=copy` on every profile (`mpv.conf:75` etc.); keep absolute `C:/mpv/...` shader paths; keep `include` before profiles (`mpv.conf:31` must precede `[Res-SD]`); test profile conditions with `mpv --show-profile=<name>`. Keep `profile-cond` nil guards (`height~=nil and ...`). Keep `reset-on-next-file` list (`mpv.conf:53`) — removing entries leaks state across playlist.
-- **input.conf:** Preserve `MBTN_RIGHT` (`input.conf:10`) + `MENU` (`input.conf:11`) bindings or uosc menu breaks (right-click shows nothing). `#!` comments are menu items — syntax is `command #! Menu > Path`. `change-list glsl-shaders del` on non-loaded shader is no-op (safe to list all 9 for `Alt+h` `input.conf:44`). Don't reorder `Alt+h` shader list without verifying all 4 hdr-toys profiles.
+- **mpv.conf:** Keep `profile-restore=copy` on every profile (`mpv.conf:75` etc.); keep absolute `C:/mpv/...` shader paths; keep `include` before profiles (`mpv.conf:34` must precede `[Res-SD]`); test profile conditions with `mpv --show-profile=<name>`. Keep `profile-cond` nil guards (`height~=nil and ...`). Keep `reset-on-next-file` list (`mpv.conf:53`) — removing entries leaks state across playlist.
+- **input.conf:** Preserve `MBTN_RIGHT` (`input.conf:10`) + `MENU` (`input.conf:11`) bindings or uosc menu breaks (right-click shows nothing). `#!` comments are menu items — syntax is `command #! Menu > Path`. `change-list glsl-shaders del` on non-loaded shader is no-op (safe to list all 9 for `Alt+h` `input.conf:63`). Don't reorder `Alt+h` shader list without verifying all 4 hdr-toys profiles.
 - **script-opts:** Each file documents upstream defaults inline — only intentional divergences are `observe_audio_switches=yes` (`sub_select.conf:7`), `auto=yes` (`changerefresh.conf:14`), `max_height/width=400` + `tone_mapping=mobius` (`thumbfast.conf:17-35`), NieR palette (`uosc.conf:88`) + `timeline_size=40 opacity=0.85` etc. Keep comments explaining why each diverges.
 - **shaders:** Never hand-edit `hdr-toys/` — will be overwritten by daily updater. For top-level LFS shaders, ensure `git lfs install` + `git lfs pull` or you'll commit 130-byte pointer text. Don't add `hdr-toys/` to LFS.
 - **scripts:** `uosc/` is vendored upstream — prefer `Update-MpvEnvironment.ps1:277-281` sync over hand patches; local patches to `display/change-refresh.lua` (Set-RefreshRate integration) are intentional and must be preserved. Shims (`display/main.lua` etc.) are intentionally tiny — don't inline them.
@@ -328,7 +338,7 @@ powershell -File portable_config/tools/Set-RefreshRate.ps1 -Width 1920 -Height 1
 2. **hdr-toys hand-port fell behind:** Bottosson stayed loaded days after upstream switched default to jedypod — hence `include` + auto-sync instead of hand-ported profiles (`Update-MpvEnvironment.ps1:263-266` comment). Hand-porting drifts.
 3. **hdr-toys `~~/` path failure:** `~~/shaders/hdr-toys/` sometimes doesn't resolve under portable — hence `C:/` absolute rewrite (`Update-MpvEnvironment.ps1:40,271`). Don't revert to `~~/`.
 4. **DEVMODE padding bug:** Spurious 2-byte alignment field shifted struct to 158 bytes → `DISP_CHANGE_BADMODE (-2)` on valid modes — fixed by removing padding, added 156-byte hard check (`Set-RefreshRate.ps1:41-46,81-85`). If you edit DEVMODE, keep the byte-count comment and verify `SizeOf == 156`.
-5. **Alt+h incomplete del (2026-08-25):** Originally del'd only 5 PQ shaders, left HLG/bt.2020/linear shaders active — fixed to del all 9 (`input.conf:44` + `hdr-toys.conf:11,23,34,43` 4 profiles). Must list all 9 unconditionally (del is no-op if not loaded).
+5. **Alt+h incomplete del (2026-08-25):** Originally del'd only 5 PQ shaders, left HLG/bt.2020/linear shaders active — fixed to del all 9 (`input.conf:63` + `hdr-toys.conf:11,23,34,43` 4 profiles). Must list all 9 unconditionally (del is no-op if not loaded).
 6. **thumbfast `tone_mapping=auto` trap:** Picks up mpv's sentinel `tone-mapping` value literally when hdr-toys is active — hence `mobius` explicit (`thumbfast.conf:27-35`). `auto` would use `clip` placeholder from `hdr-toys.conf:8`, not real curve.
 7. **Mutex race (2026-08-16):** Two logon triggers overlapped and raced on `$WorkDir` — hence `Global\mpv-autoupdate-lock` mutex (`Update-MpvEnvironment.ps1:252`) + `Register-MpvAutoupdate.ps1:19` `MultipleInstances IgnoreNew`. Don't remove either.
 8. **changerefresh `165` must stay:** Script's revert logic requires desktop native rate in `rates` list (`changerefresh.conf:8-10` comment). User confirmed 165 is native 1440p rate — removing it breaks revert.
@@ -354,7 +364,7 @@ powershell -File portable_config/tools/Set-RefreshRate.ps1 -Width 1920 -Height 1
 | change-refresh | custom (CogentRedTester base + Set-RefreshRate) | `portable_config/scripts/display/change-refresh.lua` (22 KB) + `tools/Set-RefreshRate.ps1` | Local custom |
 | mpvSockets | [Chinna95P/mpv-anime-build](https://github.com/Chinna95P/mpv-anime-build/blob/main/scripts/mpvSockets.lua) | `portable_config/scripts/utilities/mpvSockets.lua` (1373 bytes) | Manual, per-PID pipe |
 | ArtCNN | [Artoriuz/ArtCNN](https://github.com/Artoriuz/ArtCNN) | `portable_config/shaders/ArtCNN_C4F32.glsl` (LFS pointer 131b) | Git LFS |
-| ravu | [bjin/mpv-prescalers](https://github.com/bjin/mpv-prescalers) | `portable_config/shaders/ravu-zoom-ar-r3.hook` (132b) | Git LFS |
+| ravu | [bjin/mpv-prescalers](https://github.com/bjin/mpv-prescalers) | `portable_config/shaders/ravu-zoom-ar-r4.hook` (132b) | Git LFS |
 | nlmeans | [AN3223/dotfiles](https://github.com/AN3223/dotfiles) | `portable_config/shaders/nlmeans.glsl` (130b) | Git LFS |
 | CfL | — | `portable_config/shaders/CfL_Prediction.glsl` (130b) | Git LFS |
 
@@ -377,13 +387,13 @@ git push
 # LFS (required for shaders)
 git lfs install               # once per machine
 git lfs pull                  # fetch real shader blobs after clone
-git lfs ls-files              # verify 4 shaders are LFS objects, not pointers
+git lfs ls-files              # verify 6 shaders are LFS objects, not pointers
 git lfs status
 ```
 
 - Remote: `https://github.com/AnxoSilvaSixto/mpv-config.git`
 - When referencing code, use `file_path:line_number` (e.g., `portable_config/mpv.conf:31`, `tools/Set-RefreshRate.ps1:82`)
-- `.gitignore:4-11` ignores `mpv.exe`, `mpv.com`, `portable_config/cache/`, `tools/update-state.json`, `update-log.txt` — never force-add them
+- `.gitignore:4-5,11-13` ignores `mpv.exe`, `mpv.com`, `portable_config/cache/`, `tools/update-state.json`, `update-log.txt`, `track-selector-overrides.json` — never force-add them
 - `.gitattributes:2-3` tracks `portable_config/shaders/*.glsl` + `*.hook` via LFS — keep `hdr-toys/` out of LFS
 
 ---
@@ -403,4 +413,4 @@ git lfs status
 
 ---
 
-*Last updated: 2026-08-31 — synced with `Update-MpvEnvironment.ps1:324`, `installer/updater.ps1:796`, `mpv.conf:141`, `hdr-toys.conf:59`, `input.conf:51`, `uosc.conf:102`, `thumbfast.conf:72`, `changerefresh.conf:43`, `sub_select.conf:14`, `Set-RefreshRate.ps1:124`, `Register-MpvAutoupdate.ps1:27`, `updater.bat:24`, `settings.xml:8`, `mpv/fonts.conf:103`, shaders 77 files/298 KB, thumbfast 32 KB, uosc 43 KB+*
+*Last updated: 2026-09-08 — synced with `Update-MpvEnvironment.ps1:364`, `installer/updater.ps1:796`, `mpv.conf:156`, `hdr-toys.conf:59`, `input.conf:70`, `uosc.conf:102`, `thumbfast.conf:72`, `changerefresh.conf:43`, `sub_select.conf:14`, `Set-RefreshRate.ps1:124`, `Register-MpvAutoupdate.ps1:27`, `updater.bat:24`, `settings.xml:8`, `mpv/fonts.conf:103`, shaders 77 files/298 KB, thumbfast 32 KB, uosc 43 KB+*
