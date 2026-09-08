@@ -115,11 +115,9 @@ function Save-State {
     try {
         $json = $State | ConvertTo-Json -Depth 3
         [System.IO.File]::WriteAllText($tempState, $json, (New-Object System.Text.UTF8Encoding($false)))
-        if (Test-Path $StateFile) {
-            [System.IO.File]::Replace($tempState, $StateFile, $null)
-        } else {
-            [System.IO.File]::Move($tempState, $StateFile)
-        }
+        # Fixed 2026-09-08: [IO.File]::Replace($temp,$dest,$null) throws "path invalid" on this PS/.NET (even with "" backup)
+        # Move-Item -Force is atomic enough for this single-writer (mutex-guarded) state file and avoids the .NET overload issue.
+        Move-Item -Path $tempState -Destination $StateFile -Force
     } finally {
         Remove-Item $tempState -Force -ErrorAction SilentlyContinue
     }
@@ -295,7 +293,6 @@ Update-GitFolder -Repo $HdrToysRepo -StateKey 'hdrtoys' -Paths @(
     @{ Source = 'shaders\hdr-toys'; Dest = 'shaders\hdr-toys'; IsDir = $true }
             @{ Source = 'hdr-toys.conf'; Dest = 'hdr-toys.conf'; IsDir = $false;
                Transforms = @(
-                   @{ Find = [regex]::Escape('~~/shaders/hdr-toys/'); Replace = "$HdrShaderRoot/" }
                    @{ Find = [regex]::Escape('gamut-mapping/bottosson.glsl'); Replace = 'gamut-mapping/jedypod.glsl' }
                );
                Header = "# !!! AUTO-MANAGED by Update-MpvEnvironment.ps1 !!!`r`n# This file is synced from upstream hdr-toys on every update run.`r`n# Any manual edits will be LOST on the next update.`r`n# To customize HDR behavior, edit mpv.conf profiles instead.`r`n" }
@@ -337,13 +334,21 @@ Update-GitFolder -Repo $UlyssesRepo -StateKey 'ulysses' -RepoBranch $UlyssesBran
 )
 
 # Post-process track-selector to preserve es dub -> no subs patch (faithful to slang=es)
-# If upstream overwrote our 5-line es block, re-inject it. Idempotent: only patches if marker missing.
+# If upstream overwrote our es block, re-inject it. Idempotent: only patches if marker missing.
 $trackSelectorPath = Join-Path $ConfigDir 'scripts\track-selector.lua'
 if (Test-Path $trackSelectorPath) {
     $trackContent = Get-Content $trackSelectorPath -Raw
     if ($trackContent -notmatch 'Spanish audio detected') {
         Write-Log "track-selector: re-applying es dub patch (Spanish audio -> no subs)"
-        $trackContent = $trackContent -replace "local selected_audio_lang = mp.get_property\('audio-params/lang'\)", "local selected_audio_lang = mp.get_property('audio-params/lang')`r`n    -- faithful to user slang=es prioritization: if we selected Spanish audio, don't show subs`r`n    if selected_audio_lang and selected_audio_lang:find('^es') then`r`n        msg.info('Smart Sub: Spanish audio detected (' .. selected_audio_lang .. ') -> disabling subs per es dub rule')`r`n        local selected_sid = 'no'`r`n        mark_internal_change('sid', selected_sid)`r`n        msg.info('Smart Sub: Spanish audio ...')`r`n        return`r`n    end`r`n    local _es_patched = true"
+        # Current layout (2026-09+): selected_audio_lang is initialized to "" then populated via loop;
+        # inject before the CONTEXT DETECTION marker which exists in all recent versions.
+        if ($trackContent -match "-- 2\. CONTEXT DETECTION") {
+            $esBlock = "    -- faithful to user slang=es prioritization: if we selected Spanish audio, don't show subs`r`n    if selected_audio_lang and selected_audio_lang:find('^es') then`r`n        msg.info('Smart Sub: Spanish audio detected (' .. selected_audio_lang .. ') -> disabling subs per es dub rule')`r`n        if mp.get_property('sid') ~= 'no' then`r`n            mark_internal_change('subtitle', 'no')`r`n            mp.set_property('sid', 'no')`r`n        end`r`n        return`r`n    end`r`n    local _es_patched = true`r`n`r`n    -- 2. CONTEXT DETECTION"
+            $trackContent = $trackContent -replace "-- 2\. CONTEXT DETECTION", $esBlock
+        } else {
+            # Legacy fallback: very old file used mp.get_property('audio-params/lang') inline
+            $trackContent = $trackContent -replace "local selected_audio_lang = mp.get_property\('audio-params/lang'\)", "local selected_audio_lang = mp.get_property('audio-params/lang')`r`n    -- faithful to user slang=es prioritization: if we selected Spanish audio, don't show subs`r`n    if selected_audio_lang and selected_audio_lang:find('^es') then`r`n        msg.info('Smart Sub: Spanish audio detected (' .. selected_audio_lang .. ') -> disabling subs per es dub rule')`r`n        local selected_sid = 'no'`r`n        mark_internal_change('sid', selected_sid)`r`n        msg.info('Smart Sub: Spanish audio ...')`r`n        return`r`n    end`r`n    local _es_patched = true"
+        }
         $trackContent | Set-Content -Path $trackSelectorPath -NoNewline
     }
 }

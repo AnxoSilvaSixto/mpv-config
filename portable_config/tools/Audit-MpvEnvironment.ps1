@@ -153,17 +153,18 @@ if (-not (Test-Path $Mpv)) {
     }
 }
 
-# Validate that relocation-sensitive paths are derived from the active config root.
+# Validate that relocation-sensitive paths are derived from the active config root or kept portable.
 $refreshScript = Get-Content (Join-Path $Root 'portable_config/scripts/display/change-refresh.lua') -Raw
-$expectedHdrRoot = ((Join-Path $ConfigDir 'shaders\hdr-toys') -replace '\\', '/')
 $probeConfigDir = Join-Path $env:TEMP 'mpv-audit-portable_config'
 $probePath = Join-Path $probeConfigDir 'shaders\hdr-toys'
 $normalizedProbe = $probePath -replace '\\', '/'
-$hasHdrAssignment = $updater -match '\$HdrShaderRoot\s*=\s*\(\(Join-Path\s+\$ConfigDir'
-$hasHdrTransform = $updater -match 'Replace\s*=\s*"\$HdrShaderRoot/"'
-$hasPsNormalizer = [regex]::IsMatch($updater, "-replace\s+'\\\\'\s*,\s*'/'")
-if ($hasHdrAssignment -and $hasHdrTransform -and $hasPsNormalizer -and ($updater -notmatch 'C:/mpv/portable_config/shaders/hdr-toys') -and ($normalizedProbe -eq (($probeConfigDir + '\shaders\hdr-toys') -replace '\\', '/'))) {
-    Pass "hdr-toys updater derives normalized shader paths from config root ($expectedHdrRoot)"
+$hasJedypodTransform = $updater -match 'bottosson.*jedypod'
+$hasNoHardcodedMpv = ($updater -notmatch 'C:/mpv') -and ($updater -notmatch 'C:\\mpv')
+# hdr-toys.conf should now keep portable ~~ paths (verified via config include test), not absolute C:/mpv rewrite
+$hdrToysConf = Get-Content (Join-Path $Root 'portable_config/hdr-toys.conf') -Raw
+$hdrUsesPortable = $hdrToysConf -match '~~/shaders/hdr-toys'
+if ($hasJedypodTransform -and $hasNoHardcodedMpv -and $hdrUsesPortable -and ($normalizedProbe -eq (($probeConfigDir + '\shaders\hdr-toys') -replace '\\', '/'))) {
+    Pass "hdr-toys updater keeps portable ~~ paths and applies jedypod mapping"
 } else {
     Fail 'hdr-toys updater has a missing, hard-coded, or invalid shader path transform'
 }

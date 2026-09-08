@@ -11,7 +11,7 @@
 #>
 
 $Action = New-ScheduledTaskAction -Execute 'powershell.exe' `
-    -Argument '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "C:\mpv\portable_config\tools\Update-MpvEnvironment.ps1"'
+    -Argument '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$PSScriptRoot\Update-MpvEnvironment.ps1"'
 
 $Trigger = New-ScheduledTaskTrigger -AtLogOn
 $Trigger.Delay = 'PT1M'   # 1-minute delay after login, so networking has time to come up before the first request fires
@@ -24,4 +24,4 @@ Register-ScheduledTask -TaskName 'mpv-autoupdate' `
     -Force
 
 Write-Host "Registered. Test it immediately with:  Start-ScheduledTask -TaskName 'mpv-autoupdate'"
-Write-Host "Then check the log at C:\mpv\portable_config\tools\update-log.txt"
+Write-Host "Then check the log at $PSScriptRoot\update-log.txt"

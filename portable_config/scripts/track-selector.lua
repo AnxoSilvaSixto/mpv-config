@@ -1,3 +1,4 @@
+-- Source: Chinna95P/mpv-anime-build (scripts/track-selector.lua)
 -- [[
 --    FILENAME: track-selector.lua
 --    VERSION:  v3.5 (Added priorities for User selection)
@@ -566,17 +567,16 @@ local function select_smart_tracks()
         end
     end
 
-    -- 1b. SPANISH DUB RULE (preserved from sub-select.json: es audio -> no subs)
     -- faithful to user slang=es prioritization: if we selected Spanish audio, don't show subs
     if selected_audio_lang and selected_audio_lang:find("^es") then
         msg.info("Smart Sub: Spanish audio detected (" .. selected_audio_lang .. ") -> disabling subs per es dub rule")
-        -- apply no-sub if not already
         if mp.get_property("sid") ~= "no" then
             mark_internal_change("subtitle", "no")
             mp.set_property("sid", "no")
         end
         return
     end
+    local _es_patched = true
 
     -- 2. CONTEXT DETECTION
     local is_anime_context = detect_anime_context(tracks)
