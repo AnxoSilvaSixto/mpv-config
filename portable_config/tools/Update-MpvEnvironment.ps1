@@ -37,7 +37,6 @@ $ToolsDir    = Join-Path $ConfigDir 'tools'
 $StateFile   = Join-Path $ToolsDir 'update-state.json'         # remembers what version/commit is currently installed
 $LogFile     = Join-Path $ToolsDir 'update-log.txt'
 $WorkDir     = Join-Path $env:TEMP 'mpv-autoupdate'            # scratch space, cleaned up after each run
-$HdrShaderRoot = ((Join-Path $ConfigDir 'shaders\hdr-toys') -replace '\\', '/')
 
 $HdrToysRepo   = 'natural-harmonia-gropius/hdr-toys'              # matches the shaders already in shaders\hdr-toys\
 $UoscRepo      = 'tomasklaen/uosc'                                # upstream uosc (fork was stale, last push 2026-08-17)
@@ -233,11 +232,11 @@ function Update-GitFolder {
                 # Text transforms instead of a byte-for-byte copy (each: @{Find=...; Replace=...},
                 # applied in order; optional Required=$true throws FAIL-LOUD when Find matches
                 # nothing, since -replace otherwise silently no-ops on a missing pattern).
-                # Added 2026-08-25 for hdr-toys.conf: one rule rewrites its ~~/ shader paths to a
-                # normalized path under this config root
-                # (~~/ is documented to sometimes not resolve correctly under a portable_config
-                # setup specifically), the other keeps jedypod over bottosson since upstream's own
-                # hdr-toys.conf hasn't caught up to its own v2504 release notes on that point.
+                # Added 2026-08-25 for hdr-toys.conf: hdr-toys now keeps its portable ~~/
+                # shader paths verbatim (audit-verified); the sole transform is
+                # bottosson -> jedypod per upstream v2504 release notes (Required=$true so a
+                # missing pattern fails loud), since upstream's own hdr-toys.conf hasn't
+                # caught up to its v2504 notes on that point.
                 # Optional Header field prepends a comment block after transforms (hdr-toys.conf).
                 New-Item -ItemType Directory -Force -Path (Split-Path $dst) | Out-Null
                 $text = Get-Content $src -Raw -ErrorAction Stop
