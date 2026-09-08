@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Daily updater for mpv, hdr-toys, uosc, thumbfast, and two anime-build scripts.
+    Daily updater for mpv, hdr-toys, uosc, thumbfast, anime-build (mpvSockets, skip_intro, track-selector, SSim) and Ulysses auto-save-state.
 .DESCRIPTION
     Checks each of the six against its upstream source and only downloads
     when something actually changed - safe to run on every login, since an
@@ -42,8 +42,10 @@ $HdrShaderRoot = ((Join-Path $ConfigDir 'shaders\hdr-toys') -replace '\\', '/')
 $HdrToysRepo   = 'natural-harmonia-gropius/hdr-toys'              # matches the shaders already in shaders\hdr-toys\
 $UoscRepo      = 'tomasklaen/uosc'                                # upstream uosc (fork was stale, last push 2026-08-17)
 $ThumbfastRepo = 'po5/thumbfast'                                  # single file at the repo root - verified default branch below, 2026-08-19
-$AnimeBuildRepo = 'Chinna95P/mpv-anime-build'                     # vendored mpvSockets.lua + skip_intro.lua - branch 'main' (not $Branch)
+$AnimeBuildRepo = 'Chinna95P/mpv-anime-build'                     # vendored mpvSockets.lua + skip_intro.lua + track-selector.lua + SSim shaders - branch 'main' (not $Branch)
 $AnimeBuildBranch = 'main'                                        # Chinna95P default branch; kept separate so $Branch ('master') stays untouched
+$UlyssesRepo = 'popeyeurs/ulyssescaballes-mpv.config'              # auto-save-state.lua - branch 'main'
+$UlyssesBranch = 'main'
 $Branch        = 'master'                                         # default branch for hdr-toys and thumbfast; uosc overrides via -RepoBranch 'main'
 
 # ===== AGENTS.md: Chinna95P/mpv-anime-build vendored scripts (Fix 3, 2026-09-07) =====
@@ -76,7 +78,7 @@ function Write-Log {
 
 function Get-State {
     # State = last-installed version/commit per component, so unchanged days do zero downloading.
-    $defaults = [pscustomobject]@{ mpv = ''; hdrtoys = ''; uosc = ''; thumbfast = ''; animebuild = '' }
+    $defaults = [pscustomobject]@{ mpv = ''; hdrtoys = ''; uosc = ''; thumbfast = ''; animebuild = ''; ulysses = '' }
     if (Test-Path $StateFile) {
         try {
             $loaded = Get-Content $StateFile -Raw | ConvertFrom-Json -ErrorAction Stop
@@ -323,7 +325,28 @@ Update-GitFolder -Repo $AnimeBuildRepo -StateKey 'animebuild' -RepoBranch $Anime
            @{ Find = 'FF8000'; Replace = '6a8faf'; Required = $true }
        );
        Header = "-- !!! AUTO-MANAGED by Update-MpvEnvironment.ps1 !!!`r`n-- Synced from upstream Chinna95P/mpv-anime-build (scripts/skip_intro.lua) with local NieR palette; manual edits will be LOST.`r`n" }
+    @{ Source = 'scripts\track-selector.lua'; Dest = 'scripts\track-selector.lua'; IsDir = $false;
+       Header = "-- Source: Chinna95P/mpv-anime-build (scripts/track-selector.lua)`r`n" }
+    @{ Source = 'shaders\SSimSuperRes.glsl'; Dest = 'shaders\SSimSuperRes.glsl'; IsDir = $false }
+    @{ Source = 'shaders\SSimDownscaler.glsl'; Dest = 'shaders\SSimDownscaler.glsl'; IsDir = $false }
 )
+
+# Ulysses auto-save-state (2026-09-08): single file from popeyeurs config
+Update-GitFolder -Repo $UlyssesRepo -StateKey 'ulysses' -RepoBranch $UlyssesBranch -Paths @(
+    @{ Source = 'portable_config\scripts\auto-save-state.lua'; Dest = 'scripts\auto-save-state.lua'; IsDir = $false }
+)
+
+# Post-process track-selector to preserve es dub -> no subs patch (faithful to slang=es)
+# If upstream overwrote our 5-line es block, re-inject it. Idempotent: only patches if marker missing.
+$trackSelectorPath = Join-Path $ConfigDir 'scripts\track-selector.lua'
+if (Test-Path $trackSelectorPath) {
+    $trackContent = Get-Content $trackSelectorPath -Raw
+    if ($trackContent -notmatch 'Spanish audio detected') {
+        Write-Log "track-selector: re-applying es dub patch (Spanish audio -> no subs)"
+        $trackContent = $trackContent -replace "local selected_audio_lang = mp.get_property\('audio-params/lang'\)", "local selected_audio_lang = mp.get_property('audio-params/lang')`r`n    -- faithful to user slang=es prioritization: if we selected Spanish audio, don't show subs`r`n    if selected_audio_lang and selected_audio_lang:find('^es') then`r`n        msg.info('Smart Sub: Spanish audio detected (' .. selected_audio_lang .. ') -> disabling subs per es dub rule')`r`n        local selected_sid = 'no'`r`n        mark_internal_change('sid', selected_sid)`r`n        msg.info('Smart Sub: Spanish audio ...')`r`n        return`r`n    end`r`n    local _es_patched = true"
+        $trackContent | Set-Content -Path $trackSelectorPath -NoNewline
+    }
+}
 
 # Added 2026-09-06: wrapped in try/catch. A run on 2026-09-06 12:20 checked every
 # component successfully but never reached Save-State or the "finished" line below -

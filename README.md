@@ -107,3 +107,8 @@ The vendored uosc source contains an OpenSubtitles API-key field in its upstream
 - [thumbfast](https://github.com/po5/thumbfast)
 - [hdr-toys](https://github.com/natural-harmonia-gropius/hdr-toys)
 - [mpv-sub-select](https://github.com/CogentRedTester/mpv-sub-select)
+- [track-selector](https://github.com/Chinna95P/mpv-anime-build/blob/main/scripts/track-selector.lua) — commentary-safe audio/subs (Chinna95P, es dub patch)
+- [auto-save-state](https://github.com/popeyeurs/ulyssescaballes-mpv.config/blob/main/portable_config/scripts/auto-save-state.lua) — watch-later every 1s (Ulysses Caballes)
+- [SSimSuperRes / SSimDownscaler](https://github.com/Chinna95P/mpv-anime-build/blob/main/shaders/SSimSuperRes.glsl) — anti-ringing helpers by Shiandow (via Chinna95P)
+- [ravu-zoom](https://github.com/bjin/mpv-prescalers) — faithful adaptive upscaler (r4 fallback copy, bjin 404)
+- [ArtCNN](https://github.com/Artoriuz/ArtCNN) — exact 2x for 720p→1440p

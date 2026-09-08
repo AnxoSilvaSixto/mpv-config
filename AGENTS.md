@@ -367,6 +367,10 @@ powershell -File portable_config/tools/Set-RefreshRate.ps1 -Width 1920 -Height 1
 | ravu | [bjin/mpv-prescalers](https://github.com/bjin/mpv-prescalers) | `portable_config/shaders/ravu-zoom-ar-r4.hook` (132b) | Git LFS |
 | nlmeans | [AN3223/dotfiles](https://github.com/AN3223/dotfiles) | `portable_config/shaders/nlmeans.glsl` (130b) | Git LFS |
 | CfL | — | `portable_config/shaders/CfL_Prediction.glsl` (130b) | Git LFS |
+| track-selector | [Chinna95P/mpv-anime-build](https://github.com/Chinna95P/mpv-anime-build/blob/main/scripts/track-selector.lua) | `portable_config/scripts/track-selector.lua` (31 KB, es dub patch) | Vendored (auto-updated via Update-MpvEnvironment `animebuild`) |
+| auto-save-state | [popeyeurs/ulyssescaballes-mpv.config](https://github.com/popeyeurs/ulyssescaballes-mpv.config/blob/main/portable_config/scripts/auto-save-state.lua) | `portable_config/scripts/auto-save-state.lua` (2.4 KB) | Vendored (auto-updated) |
+| SSimSuperRes | [Shiandow via Chinna95P](https://github.com/Chinna95P/mpv-anime-build/blob/main/shaders/SSimSuperRes.glsl) | `portable_config/shaders/SSimSuperRes.glsl` (5,965B) | Git LFS (auto-updated) |
+| SSimDownscaler | [Shiandow via Chinna95P](https://github.com/Chinna95P/mpv-anime-build/blob/main/shaders/SSimDownscaler.glsl) | `portable_config/shaders/SSimDownscaler.glsl` (5,656B) | Git LFS (auto-updated) |
 
 ---
 
