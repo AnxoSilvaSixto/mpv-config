@@ -22,7 +22,7 @@ C:\mpv\
 │   │   ├── uosc/                 # UI (tomasklaen/uosc) — main.lua + elements/lib/intl/char-conv
 │   │   ├── media/                # bundle loader + 5 handlers: skip_intro, sub-select (DISABLED), betterchapters, fix-sub-timing, Up_Next
 │   │   ├── display/              # change-refresh.lua + loader shim
-│   │   └── utilities/            # autocrop, autodeint, mpvSockets + bundle shim (may locally require mpv-watch-history.lua, untracked)
+│   │   └── utilities/            # autocrop, autodeint, mpvSockets + bundle shim
 │   ├── script-opts/
 │   │   ├── uosc.conf             # NieR:Automata palette, floating bar
 │   │   ├── thumbfast.conf        # 400×400, mobius, hwdec=yes
@@ -55,11 +55,9 @@ C:\mpv\
 
 - **Never commit binaries:** `mpv.exe`/`mpv.com` are ignored, managed by updater.
 - **Never commit cache/state/logs:** `portable_config/cache/`, `tools/update-state.json`, `tools/update-log.txt`, `track-selector-overrides.json` are ignored. Updater rotates cache (>30d shaders, >7d watch_later) and log (>500 lines).
-- **Never commit watch history helpers untracked locally:** `mpv-history.jsonl` and `mpv-watch-history.lua` are local AniVault helpers — keep them untracked.
 - **Never edit `hdr-toys.conf`:** auto-managed; customize via `mpv.conf` profiles or `Update-MpvEnvironment.ps1` transforms (jedypod mapping). Edits are lost on next sync.
 - **Preserve portable structure:** don't rename `portable_config/`, don't remove `updater.bat`/`mpv-register.bat`, keep `~~/` shader paths.
 - **Bundle shims stay:** `display/main.lua`, `utilities/main.lua`, `media/main.lua` are `require` re-exports that group scripts per folder. `mpvSockets.lua` is real IPC logic (per-PID pipe), not a shim. `thumbfast.lua` must stay top-level (`scripts/thumbfast.lua`), not nested.
-- **Local-only script:** `portable_config/scripts/utilities/mpv-watch-history.lua` is an untracked local helper (AniVault watch log). `utilities/main.lua` may `require './mpv-watch-history'` locally — this require is intentionally untracked and must not be assumed present in clone. Don't commit it or require it in CI expectations.
 
 ---
 

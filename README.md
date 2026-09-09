@@ -22,7 +22,7 @@ C:\mpv\
 │   │   ├── uosc/                      # UI and bundled modules
 │   │   ├── media/                     # skip_intro, sub-select, betterchapters, fix-sub-timing, Up_Next + loader
 │   │   ├── display/                   # change-refresh and its loader
-│   │   └── utilities/                 # autocrop, autodeint, mpvSockets (optional pcall mpv-watch-history)
+│   │   └── utilities/                 # autocrop, autodeint, mpvSockets
 │   ├── script-opts/                   # uosc, thumbfast, refresh, subtitle options
 │   ├── shaders/
 │   │   ├── hdr-toys/                  # 77 files plain text (~300 KB)
