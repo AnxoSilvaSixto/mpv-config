@@ -50,8 +50,7 @@ Write-Host "Auditing portable mpv root: $Root"
     'portable_config/scripts/display/main.lua',
     'portable_config/scripts/display/change-refresh.lua',
     'portable_config/tools/Update-MpvEnvironment.ps1',
-    'portable_config/tools/Set-RefreshRate.ps1',
-    'settings.xml'
+    'portable_config/tools/Set-RefreshRate.ps1'
 ) | ForEach-Object { Check-Path $_ }
 
 # Validator-only negative assertion: the obsolete media/thumbfast.lua path must
@@ -86,10 +85,15 @@ try {
 } catch {
     Warn "update-state.json was not parsed (it may be intentionally absent or ignored): $($_.Exception.Message)"
 }
-try {
-    [void][xml](Get-Content (Join-Path $Root 'settings.xml') -Raw)
-    Pass 'settings.xml parses'
-} catch { Fail "settings.xml XML parse failed: $($_.Exception.Message)" }
+$settingsPath = Join-Path $Root 'settings.xml'
+if (Test-Path $settingsPath) {
+    try {
+        [void][xml](Get-Content $settingsPath -Raw)
+        Pass 'settings.xml parses (legacy, present)'
+    } catch { Fail "settings.xml XML parse failed: $($_.Exception.Message)" }
+} else {
+    Pass 'settings.xml absent (legacy removed, expected)'
+}
 
 # hdr-toggle.lua: must exist and expose hdr-toys filtering via script-binding
 $hdrTogglePath = Join-Path $Root 'portable_config/scripts/hdr-toggle.lua'

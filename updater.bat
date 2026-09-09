@@ -1,7 +1,6 @@
 @echo OFF
-:: Primary entry point — runs the preferred component updater
+:: Primary entry point — runs Update-MpvEnvironment.ps1; no legacy fallback
 :: portable_config/tools/Update-MpvEnvironment.ps1 (mpv + hdr-toys + uosc + thumbfast + track-selector).
-:: installer/updater.ps1 is legacy (interactive yt-dlp/ffmpeg); invoke it directly if you need that path.
 pushd %~dp0
 set updater_script="%~dp0\portable_config\tools\Update-MpvEnvironment.ps1"
 

@@ -42,10 +42,8 @@ C:\mpv\
 │   │   ├── Register-MpvAutoupdate.ps1 # logon task registration
 │   │   └── Set-RefreshRate.ps1        # Win32 display helper
 │   └── cache/                    # shader cache + watch_later — ignored, auto-generated
-├── installer/updater.ps1         # legacy/full updater (yt-dlp/ffmpeg) — invoke directly if needed
 ├── updater.bat                   # primary entry → portable_config/tools/Update-MpvEnvironment.ps1
 ├── mpv.exe / mpv.com             # ignored binaries (managed by updater)
-├── settings.xml                  # legacy updater settings (arch x86_64-v3, see .gitignore)
 └── README.md / AGENTS.md / .gitignore / .gitattributes
 ```
 
@@ -59,7 +57,7 @@ C:\mpv\
 - **Never commit cache/state/logs:** `portable_config/cache/`, `tools/update-state.json`, `tools/update-log.txt`, `track-selector-overrides.json` are ignored. Updater rotates cache (>30d shaders, >7d watch_later) and log (>500 lines).
 - **Never commit watch history helpers untracked locally:** `mpv-history.jsonl` and `mpv-watch-history.lua` are local AniVault helpers — keep them untracked.
 - **Never edit `hdr-toys.conf`:** auto-managed; customize via `mpv.conf` profiles or `Update-MpvEnvironment.ps1` transforms (jedypod mapping). Edits are lost on next sync.
-- **Preserve portable structure:** don't rename `portable_config/`, don't remove `updater.bat`/`installer/updater.ps1`/`mpv-register.bat`, keep `~~/` shader paths.
+- **Preserve portable structure:** don't rename `portable_config/`, don't remove `updater.bat`/`mpv-register.bat`, keep `~~/` shader paths.
 - **Bundle shims stay:** `display/main.lua`, `utilities/main.lua`, `media/main.lua` are `require` re-exports that group scripts per folder. `mpvSockets.lua` is real IPC logic (per-PID pipe), not a shim. `thumbfast.lua` must stay top-level (`scripts/thumbfast.lua`), not nested.
 - **Local-only script:** `portable_config/scripts/utilities/mpv-watch-history.lua` is an untracked local helper (AniVault watch log). `utilities/main.lua` may `require './mpv-watch-history'` locally — this require is intentionally untracked and must not be assumed present in clone. Don't commit it or require it in CI expectations.
 
@@ -77,13 +75,13 @@ C:\mpv\
 
 | Entry | Purpose | Touches |
 |-------|---------|---------|
-| `updater.bat` → `portable_config/tools/Update-MpvEnvironment.ps1` | **preferred daily** (mpv + hdr-toys + uosc + thumbfast + animebuild scripts) | `mpv.exe`, `shaders/hdr-toys/`, `hdr-toys.conf`, `scripts/uosc/`, `fonts/`, `scripts/thumbfast.lua` |
-| `installer/updater.ps1` (legacy) | interactive yt-dlp/ffmpeg/deno workflow | `mpv.exe`, `yt-dlp.exe` etc. — invoke directly only if needed |
+| `updater.bat` → `portable_config/tools/Update-MpvEnvironment.ps1` | **sole updater** (mpv + hdr-toys + uosc + thumbfast + animebuild scripts) | `mpv.exe`, `shaders/hdr-toys/`, `hdr-toys.conf`, `scripts/uosc/`, `fonts/`, `scripts/thumbfast.lua` |
+> **Legacy installer removed in 2026-09** — `installer/updater.ps1` removed; `updater.bat` → `Update-MpvEnvironment.ps1` is the sole updater.
 
 - `Update-MpvEnvironment.ps1` is safe to run every login; unchanged day = API checks only, state in `tools/update-state.json` (ignored). Never touches `mpv.conf`/`input.conf`/`script-opts/`.
 - mpv asset is **x86_64-v3 only** (Zen 3); if no v3 asset exists in a release, updater waits — no silent fallback to baseline.
 - Scheduled task: `Register-MpvAutoupdate.ps1` registers `mpv-autoupdate` (AtLogOn + 1 min delay, mutex `Global\mpv-autoupdate-lock` prevents overlap).
-- `settings.xml` selects `x86_64-v3` for legacy updater — revert to `x86_64` for non-v3 CPUs.
+- Legacy `settings.xml` was removed in 2026-09 (arch is now hard-coded v3 in updater).
 
 ---
 

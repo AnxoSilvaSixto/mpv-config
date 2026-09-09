@@ -27,9 +27,7 @@ C:\mpv\
 │       ├── Audit-MpvEnvironment.ps1    # read-only validation/audit
 │       ├── Register-MpvAutoupdate.ps1
 │       └── Set-RefreshRate.ps1
-├── installer/updater.ps1              # legacy/full interactive updater (invoke directly)
 ├── updater.bat                        # primary entry point → portable_config/tools/Update-MpvEnvironment.ps1 (mpv+hdr-toys+uosc+thumbfast+track-selector)
-├── settings.xml                       # legacy updater settings
 └── AGENTS.md                          # maintenance rules
 ```
 
@@ -72,9 +70,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\mpv\portable_config\t
 Start-ScheduledTask -TaskName mpv-autoupdate
 ```
 
-### Legacy/full updater
-
-`updater.bat` is the primary entry point and runs `portable_config/tools/Update-MpvEnvironment.ps1` (mpv+hdr-toys+uosc+thumbfast+track-selector) — double-click it or invoke that script directly for the preferred daily update. `installer/updater.ps1` is legacy — invoke it directly only for the interactive yt-dlp/ffmpeg workflow if needed. Its `settings.xml` token field is optional. Never paste personal GitHub or service credentials into tracked files.
+> **Legacy installer removed in 2026-09** — `installer/updater.ps1` and `settings.xml` were removed; `updater.bat` → `portable_config/tools/Update-MpvEnvironment.ps1` is the sole updater. Never paste personal GitHub or service credentials into tracked files.
 
 ## Validation
 
