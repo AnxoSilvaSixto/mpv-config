@@ -91,18 +91,154 @@ try {
     Pass 'settings.xml parses'
 } catch { Fail "settings.xml XML parse failed: $($_.Exception.Message)" }
 
-# Detect, but do not modify, LFS pointer files. A clone without git-lfs is usable
-# for metadata checks but cannot use those shaders correctly.
-$lfsPointers = @()
-Get-ChildItem (Join-Path $Root 'portable_config/shaders') -File -ErrorAction SilentlyContinue | ForEach-Object {
-    if ((Get-Content $_.FullName -TotalCount 1 -ErrorAction SilentlyContinue) -match '^version https://git-lfs.github.com/spec/v1$') {
-        $lfsPointers += $_.FullName
-    }
+# hdr-toggle.lua: must exist and expose hdr-toys filtering via script-binding
+$hdrTogglePath = Join-Path $Root 'portable_config/scripts/hdr-toggle.lua'
+if (-not (Test-Path $hdrTogglePath)) {
+    Fail 'missing path: portable_config/scripts/hdr-toggle.lua'
+} else {
+    Pass 'portable_config/scripts/hdr-toggle.lua'
+    try {
+        $hdrToggleRaw = Get-Content $hdrTogglePath -Raw
+        if ($hdrToggleRaw -match 'hdr-toys') { Pass 'hdr-toggle.lua contains hdr-toys filter' }
+        else { Fail 'hdr-toggle.lua missing hdr-toys filter (must :find(''hdr-toys'',1,true))' }
+        if ($hdrToggleRaw -match 'hdr-toggle') { Pass 'hdr-toggle.lua contains hdr-toggle binding name' }
+        else { Fail 'hdr-toggle.lua missing hdr-toggle binding name' }
+        # script-binding style: must register script message or key binding so input.conf can do script-binding hdr-toggle/toggle
+        if (($hdrToggleRaw -match "mp\.add_key_binding\s*\([^\)]*'hdr-toggle'") -or ($hdrToggleRaw -match 'mp\.add_key_binding\s*\([^\)]*"hdr-toggle"') -or ($hdrToggleRaw -match "register_script_message\s*\(\s*['\""]toggle['\""]")) {
+            Pass 'hdr-toggle.lua registers script-binding hdr-toggle/toggle'
+        } else { Fail 'hdr-toggle.lua missing script-binding hdr-toggle registration (expected mp.add_key_binding ... hdr-toggle and register_script_message toggle)' }
+        # PowerShell syntax already checked above generically, but also ensure Lua is at least non-empty
+        if ($hdrToggleRaw.Length -lt 200) { Fail 'hdr-toggle.lua unexpectedly small' }
+    } catch { Fail "hdr-toggle.lua read failed: $($_.Exception.Message)" }
 }
-if ($lfsPointers.Count -gt 0) {
-    $message = "found $($lfsPointers.Count) Git LFS pointer file(s); run 'git lfs pull' before playback"
-    if ($FailOnLfsPointer) { Fail $message } else { Warn $message }
-} else { Pass 'no top-level shader LFS pointers detected' }
+
+# input.conf: Alt+h must delegate to hdr-toggle, not old 9-del chain
+$inputConfPath = Join-Path $Root 'portable_config/input.conf'
+try {
+    $inputRaw = Get-Content $inputConfPath -Raw
+    $inputLines = Get-Content $inputConfPath
+    $altHLines = @($inputLines | Where-Object { $_ -match '^\s*Alt\+h\b' })
+    if ($altHLines.Count -eq 0) {
+        Fail 'input.conf Alt+h binding missing'
+    } else {
+        $altHLine = $altHLines[0]
+        if ($altHLine -match 'script-binding\s+hdr-toggle/toggle' -or $altHLine -match 'script-binding\s+hdr-toggle') {
+            Pass 'input.conf Alt+h points to script-binding hdr-toggle/toggle'
+        } else {
+            Fail "input.conf Alt+h does not point to script-binding hdr-toggle/toggle: $altHLine"
+        }
+        # Must not still contain old 9-del chain (detect known hdr-toys shader names on Alt+h line)
+        $hasOldChain = $false
+        if ($altHLine -match 'change-list\s+glsl-shaders\s+del.*hdr-toys') { $hasOldChain = $true }
+        if ($altHLine -match 'clip_both' -or $altHLine -match 'clip_black' -or $altHLine -match 'pq_inv.*hlg_inv' -or $altHLine -match 'bottosson') { $hasOldChain = $true }
+        # Heuristic: old chain had 9 del occurrences on same line
+        $delCount = ([regex]::Matches($altHLine, 'change-list\s+glsl-shaders\s+del')).Count
+        if ($delCount -ge 3) { $hasOldChain = $true }
+        if ($hasOldChain) { Fail "input.conf Alt+h still uses old 9-del chain (must be single script-binding hdr-toggle/toggle): $altHLine" }
+        else { Pass 'input.conf Alt+h is not old 9-del chain' }
+    }
+    # Global guard: no Alt+h old chain anywhere even commented? Only check active (non-comment) lines for old chain
+    $activeOldChain = @($inputLines | Where-Object { $_ -notmatch '^\s*#' -and $_ -match '^\s*Alt\+h' -and $_ -match 'change-list' })
+    if ($activeOldChain.Count -gt 0) { Fail "input.conf has active Alt+h with change-list (should be script-binding only): $($activeOldChain -join '; ')" }
+} catch { Fail "input.conf check failed: $($_.Exception.Message)" }
+
+# fonts: ttf-only (uosc_icons.ttf + uosc_textures.ttf), no otf
+$fontsDir = Join-Path $Root 'portable_config/fonts'
+if (-not (Test-Path $fontsDir)) {
+    Fail 'missing path: portable_config/fonts'
+} else {
+    $iconTtf = Join-Path $fontsDir 'uosc_icons.ttf'
+    $texTtf = Join-Path $fontsDir 'uosc_textures.ttf'
+    $iconOtf = Join-Path $fontsDir 'uosc_icons.otf'
+    if (Test-Path $iconTtf) { Pass 'portable_config/fonts/uosc_icons.ttf exists' }
+    else { Fail 'missing path: portable_config/fonts/uosc_icons.ttf' }
+    if (Test-Path $texTtf) { Pass 'portable_config/fonts/uosc_textures.ttf exists' }
+    else { Fail 'missing path: portable_config/fonts/uosc_textures.ttf' }
+    if (Test-Path $iconOtf) { Fail 'portable_config/fonts/uosc_icons.otf must not exist (ttf-only, re-added otf is a regression)' }
+    else { Pass 'portable_config/fonts contains ttf-only (uosc_icons.otf absent)' }
+}
+
+# .github/workflows/audit.yml exists and references audit script
+$workflowPath = Join-Path $Root '.github/workflows/audit.yml'
+if (-not (Test-Path $workflowPath)) {
+    Fail 'missing path: .github/workflows/audit.yml'
+} else {
+    Pass '.github/workflows/audit.yml exists'
+    try {
+        $wfRaw = Get-Content $workflowPath -Raw
+        if ($wfRaw -match 'Audit-MpvEnvironment') { Pass '.github/workflows/audit.yml contains Audit-MpvEnvironment' }
+        else { Fail '.github/workflows/audit.yml missing Audit-MpvEnvironment reference' }
+    } catch { Fail "audit.yml read failed: $($_.Exception.Message)" }
+}
+
+# Detect, but do not modify, LFS pointer files. Refined expectations:
+# - ArtCNN/CfL/nlmeans/ravu are LFS (allowed pointers when not yet pulled)
+# - SSim*.glsl are plain text (never LFS) - 5-6 KB each
+# - hdr-toys/ is plain text (never LFS) - ~300 KB total
+$gitattributesPath = Join-Path $Root '.gitattributes'
+if (Test-Path $gitattributesPath) {
+    $ga = Get-Content $gitattributesPath -Raw
+    $lfsPatternsOk = $true
+    foreach ($pat in @('ArtCNN', 'CfL', 'nlmeans', 'ravu')) {
+        if ($ga -match ([regex]::Escape($pat) + '.*filter=lfs')) { Pass ".gitattributes tracks $pat as LFS" }
+        else { Fail ".gitattributes missing LFS tracking for $pat (expected filter=lfs)"; $lfsPatternsOk = $false }
+    }
+    if ($ga -match 'SSim.*!filter') { Pass '.gitattributes keeps SSim as plain text (!filter)' }
+    else { Fail '.gitattributes SSim must be plain text (!filter !diff !merge), not LFS' }
+    if ($ga -match 'hdr-toys.*filter=lfs') { Fail '.gitattributes must not track hdr-toys as LFS (keep plain text)' }
+    else { Pass '.gitattributes keeps hdr-toys plain text (not LFS)' }
+} else { Fail 'missing path: .gitattributes' }
+
+# Top-level shader LFS pointer refinement
+$allowedLfsNames = @('ArtCNN_C4F32.glsl', 'CfL_Prediction.glsl', 'nlmeans.glsl', 'ravu-zoom-ar-r4.hook')
+$lfsPointers = @()
+$ssimPointerNames = @()
+Get-ChildItem (Join-Path $Root 'portable_config/shaders') -File -ErrorAction SilentlyContinue | ForEach-Object {
+    $first = Get-Content $_.FullName -TotalCount 1 -ErrorAction SilentlyContinue
+    $isPointer = $first -match '^version https://git-lfs.github.com/spec/v1$'
+    if ($isPointer) { $lfsPointers += $_.Name }
+    if ($_.Name -like 'SSim*.glsl' -and $isPointer) { $ssimPointerNames += $_.Name }
+}
+if ($ssimPointerNames.Count -gt 0) {
+    Fail "SSim shader(s) are LFS pointers but must be plain text: $($ssimPointerNames -join ', ')"
+} else {
+    # Verify SSim files exist and are plain (size check, not pointer)
+    $ssimFiles = @('SSimSuperRes.glsl', 'SSimDownscaler.glsl')
+    $allPlain = $true
+    foreach ($sf in $ssimFiles) {
+        $p = Join-Path (Join-Path $Root 'portable_config/shaders') $sf
+        if (-not (Test-Path $p)) { Fail "missing SSim shader: portable_config/shaders/$sf"; $allPlain = $false }
+        else {
+            $firstLine = Get-Content $p -TotalCount 1 -ErrorAction SilentlyContinue
+            if ($firstLine -match '^version https://git-lfs.github.com/spec/v1$') { $allPlain = $false }
+            elseif ((Get-Item $p).Length -lt 1000) { Fail "SSim shader $sf unexpectedly small (<1KB, may be pointer/truncated)"; $allPlain = $false }
+        }
+    }
+    if ($allPlain) { Pass 'SSim shaders are plain text (not LFS)' }
+}
+
+$unexpectedPointers = @($lfsPointers | Where-Object { $allowedLfsNames -notcontains $_ })
+if ($unexpectedPointers.Count -gt 0) {
+    Fail "found unexpected top-level shader LFS pointer(s) (only ArtCNN/CfL/nlmeans/ravu allowed as LFS): $($unexpectedPointers -join ', ')"
+} else {
+    if ($lfsPointers.Count -gt 0) {
+        $message = "found $($lfsPointers.Count) Git LFS pointer file(s) ($($lfsPointers -join ', ')); run 'git lfs pull' before playback"
+        if ($FailOnLfsPointer) { Fail $message } else { Warn $message }
+    } else { Pass 'no top-level shader LFS pointers detected' }
+}
+
+# hdr-toys must be plain text, never LFS
+$hdrToysDir = Join-Path $Root 'portable_config/shaders/hdr-toys'
+if (Test-Path $hdrToysDir) {
+    $hdrPointers = @()
+    Get-ChildItem $hdrToysDir -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+        $first = Get-Content $_.FullName -TotalCount 1 -ErrorAction SilentlyContinue
+        if ($first -match '^version https://git-lfs.github.com/spec/v1$') { $hdrPointers += $_.FullName.Replace($Root, '').TrimStart('\','/') }
+    }
+    if ($hdrPointers.Count -gt 0) {
+        Fail "hdr-toys contains $($hdrPointers.Count) LFS pointer(s) but must be plain text: $($hdrPointers -join ', ')"
+    } else { Pass 'hdr-toys shaders are plain text (not LFS)' }
+} else { Fail 'missing path: portable_config/shaders/hdr-toys' }
 
 # Startup smoke test. Use temporary cache/watch-later locations and a temp log so
 # this audit cannot modify generated repository state.
