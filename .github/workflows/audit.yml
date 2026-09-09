@@ -1,0 +1,28 @@
+name: audit
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Run Audit-MpvEnvironment
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+          & "$PWD/portable_config/tools/Audit-MpvEnvironment.ps1"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload mpv log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpv-audit-log
+          path: |
+            portable_config/tools/update-log.txt
+            ${{ runner.temp }}/mpv-test.log
+          if-no-files-found: ignore
