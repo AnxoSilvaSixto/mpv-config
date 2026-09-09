@@ -28,7 +28,7 @@ C:\mpv\
 │       ├── Register-MpvAutoupdate.ps1
 │       └── Set-RefreshRate.ps1
 ├── installer/updater.ps1              # legacy/full interactive updater (invoke directly)
-├── updater.bat                        # 24 lines — wrapper (installer/updater.ps1 fallback; preferred daily is portable_config/tools/Update-MpvEnvironment.ps1)
+├── updater.bat                        # primary entry point → portable_config/tools/Update-MpvEnvironment.ps1 (mpv+hdr-toys+uosc+thumbfast+track-selector)
 ├── settings.xml                       # legacy updater settings
 └── AGENTS.md                          # maintenance rules
 ```
@@ -59,7 +59,7 @@ Run from any working directory:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\mpv\portable_config\tools\Update-MpvEnvironment.ps1
 ```
 
-The script derives the root from its own location and checks mpv, hdr-toys, uosc, thumbfast, and two anime-build scripts against their upstream sources. It writes state only after a component's download, extraction, and copy completes successfully. `portable_config/tools/update-state.json` is written through a temporary file and replacement; a malformed state file is treated as empty state and logged. A failed component is retried on the next run.
+Primary entry point is `updater.bat` (double-click) → `portable_config/tools/Update-MpvEnvironment.ps1`. The script derives the root from its own location and checks mpv, hdr-toys, uosc, thumbfast, and two anime-build scripts against their upstream sources. It writes state only after a component's download, extraction, and copy completes successfully. `portable_config/tools/update-state.json` is written through a temporary file and replacement; a malformed state file is treated as empty state and logged. A failed component is retried on the next run.
 
 It does not overwrite `mpv.conf`, `input.conf`, `script-opts`, or unrelated config. It may clean old shader-cache/watch-later files and rotate its ignored update log. The mpv release step needs 7-Zip and intentionally selects the x86_64-v3 asset for the Ryzen 7 5700X; it does not silently fall back to a baseline asset.
 
@@ -74,7 +74,7 @@ Start-ScheduledTask -TaskName mpv-autoupdate
 
 ### Legacy/full updater
 
-`updater.bat` is a fallback wrapper for `installer/updater.ps1` (or `updater.ps1`); for the preferred daily component update (mpv+hdr-toys+uosc+thumbfast+animebuild), invoke `portable_config/tools/Update-MpvEnvironment.ps1` directly. For the legacy interactive mpv/ffmpeg/yt-dlp workflow, also invoke `installer/updater.ps1` directly. Its `settings.xml` token field is optional. Never paste personal GitHub or service credentials into tracked files.
+`updater.bat` is the primary entry point and runs `portable_config/tools/Update-MpvEnvironment.ps1` (mpv+hdr-toys+uosc+thumbfast+track-selector) — double-click it or invoke that script directly for the preferred daily update. `installer/updater.ps1` is legacy — invoke it directly only for the interactive yt-dlp/ffmpeg workflow if needed. Its `settings.xml` token field is optional. Never paste personal GitHub or service credentials into tracked files.
 
 ## Validation
 

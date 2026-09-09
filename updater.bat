@@ -1,8 +1,7 @@
 @echo OFF
-:: Manual entry point for the preferred component updater
-:: (portable_config/tools/Update-MpvEnvironment.ps1 — mpv + hdr-toys + uosc + thumbfast).
-:: installer/updater.ps1 remains for the legacy interactive workflow (yt-dlp/ffmpeg);
-:: invoke it directly if you need that path.
+:: Primary entry point — runs the preferred component updater
+:: portable_config/tools/Update-MpvEnvironment.ps1 (mpv + hdr-toys + uosc + thumbfast + track-selector).
+:: installer/updater.ps1 is legacy (interactive yt-dlp/ffmpeg); invoke it directly if you need that path.
 pushd %~dp0
 set updater_script="%~dp0\portable_config\tools\Update-MpvEnvironment.ps1"
 

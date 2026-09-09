@@ -1,3 +1,4 @@
+# DEPRECATED: legacy interactive updater for yt-dlp/ffmpeg; retained for reference only. Primary updater is portable_config/tools/Update-MpvEnvironment.ps1 invoked via updater.bat. This file will be removed in a future release.
 $fallback7z = Join-Path (Get-Location) "\7z\7zr.exe";
 $useragent = "mpv-win-updater"
 

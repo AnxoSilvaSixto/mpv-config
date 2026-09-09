@@ -1,6 +1,7 @@
 <settings>
   <arch>x86_64-v3</arch>
   <autodelete>true</autodelete>
+  <!-- getffmpeg/getytdl are legacy installer/updater.ps1 only; Update-MpvEnvironment.ps1 always false -->
   <getffmpeg>false</getffmpeg>
   <getytdl>false</getytdl>
   <ytdlpchannel>unset</ytdlpchannel>
