@@ -11,6 +11,7 @@ portable_config/cache/
 portable_config/tools/update-log.txt
 portable_config/tools/update-state.json
 portable_config/track-selector-overrides.json
+portable_config/scripts/utilities/mpv-watch-history.lua
 
 # OS generated
 .DS_Store
