@@ -67,8 +67,16 @@ $updater = Get-Content (Join-Path $Root 'portable_config/tools/Update-MpvEnviron
 if ($updater -match 'Dest\s*=\s*[''\"]scripts\\thumbfast\.lua[''\"]') { Pass 'updater destination is scripts/thumbfast.lua' }
 else { Fail 'updater destination is not scripts/thumbfast.lua' }
 
-$mpvConf = Get-Content (Join-Path $Root 'portable_config/mpv.conf') -Raw
-if ($mpvConf -match 'profile-cond=get\("duration",0\)>0 and get\("time-remaining",0\)<=60') {
+# mpv.conf split includes check (Fix 11: profiles/res.conf + profiles/colorspace.conf)
+$mpvConfPath = Join-Path $Root 'portable_config/mpv.conf'
+$mpvConf = Get-Content $mpvConfPath -Raw
+if ($mpvConf -match 'include="~~/profiles/res\.conf"' -and $mpvConf -match 'include="~~/profiles/colorspace\.conf"') { Pass 'mpv.conf includes profiles/res.conf and profiles/colorspace.conf' } else { Fail 'mpv.conf missing include="~~/profiles/res.conf" or include="~~/profiles/colorspace.conf"' }
+Check-Path 'portable_config/profiles/res.conf'
+Check-Path 'portable_config/profiles/colorspace.conf'
+# Aggregate profile content for guards (mpv.conf + includes if present)
+$profileSearchText = $mpvConf
+foreach ($p in @('portable_config/profiles/res.conf','portable_config/profiles/colorspace.conf')) { $pp = Join-Path $Root $p; if (Test-Path $pp) { $profileSearchText += "`n" + (Get-Content $pp -Raw) } }
+if ($profileSearchText -match 'profile-cond=get\("duration",0\)>0 and get\("time-remaining",0\)<=60') {
     Pass '[ending] profile has a positive duration guard'
 } else { Fail '[ending] profile is not guarded against idle activation' }
 
