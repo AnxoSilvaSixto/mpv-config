@@ -50,6 +50,12 @@ require 'mp.options'
 -- Resolve the helper from mpv's active config directory so the portable tree
 -- can be moved without changing this vendored script.
 local function default_helper_script()
+    -- Prefer the script's own directory (always available, CWD-independent):
+    -- this file lives in scripts/display/, the helper in tools/.
+    local ok, script_dir = pcall(mp.get_script_directory)
+    if ok and script_dir and script_dir ~= '' then
+        return script_dir:gsub('\\', '/') .. '/../../tools/Set-RefreshRate.ps1'
+    end
     local config_dir = mp.get_property('config-dir')
     if config_dir and config_dir ~= '' then
         return config_dir:gsub('\\', '/') .. '/tools/Set-RefreshRate.ps1'
@@ -385,7 +391,30 @@ end
 --picks which whitelisted rate to switch the monitor to
 function findValidRate(rate)
     msg.verbose('searching for closest valid rate to ' .. rate)
-    
+
+    rate = tonumber(rate)
+
+    -- Prefer the highest whitelisted rate that is an even multiple of the
+    -- content rate (e.g. true 24fps -> 144Hz, 25fps -> 50Hz, 29.97fps -> 60Hz):
+    -- identical frames, perfectly even pacing, no interpolation, no VRR needed.
+    -- Ratio must be near-integer (tolerance 0.003): 144/23.976 = 6.006 is
+    -- correctly rejected, so fractional broadcast rates keep their fixed mode.
+    local bestMultiple = nil
+    for i = 1, #var.rateList, 1 do
+        local r = var.rateList[i]
+        if r > rate then
+            local q = r / rate
+            if math.abs(q - math.floor(q + 0.5)) < 0.003 then
+                bestMultiple = r
+            end
+        end
+    end
+    if bestMultiple ~= nil then
+        msg.verbose('even multiple found: ' .. rate .. 'fps -> ' .. bestMultiple .. 'Hz')
+        var.rates[rate] = bestMultiple
+        return bestMultiple
+    end
+
     --if the rate already exists in the table then the function just returns that
     if var.rates[rate] ~= nil then
         msg.verbose(rate .. ' already in list, returning matching rate: ' .. var.rates[rate])
@@ -393,7 +422,6 @@ function findValidRate(rate)
     end
 
     local closestRate
-    rate = tonumber(rate)
 
     --picks either the same fps in the whitelist, or the next highest
     --if none of the whitelisted rates are higher, then it uses the highest

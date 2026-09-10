@@ -770,6 +770,12 @@ mp.observe_property("aid", "string", function(name, val)
     if not track_selector_enabled or ignore_track_changes or file_transition then
         return
     end
+    -- Teardown guard (_eof_guard_patched): track-list teardown at end-file fires
+    -- these observers with no active file -- never misclassify that as a manual change.
+    if mp.get_property("path") == nil or mp.get_property_native("core-idle")
+            or #(mp.get_property_native("track-list") or {}) == 0 then
+        return
+    end
 
     if internal_aid_change and val == internal_aid_change then
         internal_aid_change = nil
@@ -785,6 +791,12 @@ end)
 
 mp.observe_property("sid", "string", function(name, val)
     if not track_selector_enabled or ignore_track_changes or file_transition then
+        return
+    end
+    -- Teardown guard (_eof_guard_patched): track-list teardown at end-file fires
+    -- these observers with no active file -- never misclassify that as a manual change.
+    if mp.get_property("path") == nil or mp.get_property_native("core-idle")
+            or #(mp.get_property_native("track-list") or {}) == 0 then
         return
     end
 

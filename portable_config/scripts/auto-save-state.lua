@@ -8,13 +8,25 @@ local options = {
 mp.options = require 'mp.options'
 mp.options.read_options(options, "auto-save-state")
 
-mp.set_property("save-position-on-quit", "yes")
+-- Ending-window awareness (mirrors the [ending] auto-profile: last 60s of a
+-- file). This script must not re-save position -- or re-enable core saving --
+-- where [ending] deliberately disabled it. Marker: _ending_aware_patched
+local function in_ending_window()
+    local dur = mp.get_property_number("duration", 0)
+    if dur <= 0 then return false end
+    return mp.get_property_number("time-remaining", 9999) <= 60
+end
+
+if not in_ending_window() then mp.set_property("save-position-on-quit", "yes") end
 
 local loaded_file_path
 local idle
 local eof_reached
 
 local function save()
+    -- [ending] owns the last 60s: freeze the entry (no writes) instead of
+    -- refreshing it; core skips its own quit-save there via save-position=no.
+    if in_ending_window() then return end
     if not idle and (not eof_reached or eof_reached and not options.delete_finished) then
         mp.command("write-watch-later-config")
     end
@@ -64,7 +76,7 @@ mp.observe_property("eof-reached", "bool", function(name, eof)
         timer_state(false)
     else
         eof_reached = false
-        mp.set_property("save-position-on-quit", "yes")
+        if not in_ending_window() then mp.set_property("save-position-on-quit", "yes") end
         timer_state(true)
     end
 end)

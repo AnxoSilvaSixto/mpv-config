@@ -371,6 +371,137 @@ try {
     Write-Log "track-selector: patch failed, continuing anyway so state still gets saved - $($_.Exception.Message)"
 }
 
+# Post-process track-selector: teardown guard (ignore aid/sid changes with no
+# active playback). Idempotent: only patches if marker missing.
+try {
+    if (Test-Path $trackSelectorPath) {
+        # ReadAllText keeps UTF-8 round-trip safe (see uosc block below).
+        $tsGuardContent = [System.IO.File]::ReadAllText($trackSelectorPath)
+        if ($tsGuardContent -match '_eof_guard_patched') {
+            # already patched, skip
+        } else {
+            $tsGuardOld = '    if not track_selector_enabled or ignore_track_changes or file_transition then
+        return
+    end'
+            $tsGuardNew = '    if not track_selector_enabled or ignore_track_changes or file_transition then
+        return
+    end
+    -- Teardown guard (_eof_guard_patched): track-list teardown at end-file fires
+    -- these observers with no active file -- never misclassify that as a manual change.
+    if mp.get_property("path") == nil or mp.get_property_native("core-idle")
+            or #(mp.get_property_native("track-list") or {}) == 0 then
+        return
+    end'
+            $tsGuardHits = ([regex]::Matches($tsGuardContent, [regex]::Escape($tsGuardOld))).Count
+            if ($tsGuardHits -eq 2) {
+                Write-Log 'track-selector: adding teardown guard (aid/sid observers)'
+                $tsGuardContent = $tsGuardContent.Replace($tsGuardOld, $tsGuardNew)
+                $tsGuardTmp = "$trackSelectorPath.$([guid]::NewGuid().ToString('N')).tmp"
+                try {
+                    [System.IO.File]::WriteAllText($tsGuardTmp, $tsGuardContent, (New-Object System.Text.UTF8Encoding($false)))
+                    Move-Item -Path $tsGuardTmp -Destination $trackSelectorPath -Force
+                } finally {
+                    Remove-Item $tsGuardTmp -Force -ErrorAction SilentlyContinue
+                }
+            } else {
+                Write-Log "track-selector: teardown-guard skipped - anchor found $tsGuardHits times, expected 2"
+            }
+        }
+    }
+} catch {
+    Write-Log "track-selector: teardown-guard patch failed, continuing anyway - $($_.Exception.Message)"
+}
+
+# Post-process auto-save-state: ending-window awareness ([ending] owns last 60s).
+# Idempotent: only patches if marker missing.
+try {
+    $saveStatePath = Join-Path $ConfigDir 'scripts\auto-save-state.lua'
+    if (Test-Path $saveStatePath) {
+        # ReadAllText keeps UTF-8 round-trip safe (see uosc block below).
+        $ssContent = [System.IO.File]::ReadAllText($saveStatePath)
+        if ($ssContent -match '_ending_aware_patched') {
+            # already patched, skip
+        } else {
+            $ssOld1 = 'mp.options.read_options(options, "auto-save-state")
+
+mp.set_property("save-position-on-quit", "yes")'
+            $ssNew1 = 'mp.options.read_options(options, "auto-save-state")
+
+-- Ending-window awareness (mirrors the [ending] auto-profile: last 60s of a
+-- file). This script must not re-save position -- or re-enable core saving --
+-- where [ending] deliberately disabled it. Marker: _ending_aware_patched
+local function in_ending_window()
+    local dur = mp.get_property_number("duration", 0)
+    if dur <= 0 then return false end
+    return mp.get_property_number("time-remaining", 9999) <= 60
+end
+
+if not in_ending_window() then mp.set_property("save-position-on-quit", "yes") end'
+            $ssOld2 = 'local function save()
+    if not idle and (not eof_reached or eof_reached and not options.delete_finished) then'
+            $ssNew2 = 'local function save()
+    -- [ending] owns the last 60s: freeze the entry (no writes) instead of
+    -- refreshing it; core skips its own quit-save there via save-position=no.
+    if in_ending_window() then return end
+    if not idle and (not eof_reached or eof_reached and not options.delete_finished) then'
+            $ssOld3 = '        eof_reached = false
+        mp.set_property("save-position-on-quit", "yes")'
+            $ssNew3 = '        eof_reached = false
+        if not in_ending_window() then mp.set_property("save-position-on-quit", "yes") end'
+            $ssHits = @(
+                ([regex]::Matches($ssContent, [regex]::Escape($ssOld1))).Count,
+                ([regex]::Matches($ssContent, [regex]::Escape($ssOld2))).Count,
+                ([regex]::Matches($ssContent, [regex]::Escape($ssOld3))).Count
+            )
+            if (($ssHits[0] -eq 1) -and ($ssHits[1] -eq 1) -and ($ssHits[2] -eq 1)) {
+                Write-Log 'auto-save-state: adding ending-window awareness ([ending] owns last 60s)'
+                $ssContent = $ssContent.Replace($ssOld1, $ssNew1).Replace($ssOld2, $ssNew2).Replace($ssOld3, $ssNew3)
+                $ssTmp = "$saveStatePath.$([guid]::NewGuid().ToString('N')).tmp"
+                try {
+                    [System.IO.File]::WriteAllText($ssTmp, $ssContent, (New-Object System.Text.UTF8Encoding($false)))
+                    Move-Item -Path $ssTmp -Destination $saveStatePath -Force
+                } finally {
+                    Remove-Item $ssTmp -Force -ErrorAction SilentlyContinue
+                }
+            } else {
+                Write-Log ("auto-save-state: ending-awareness skipped - anchors found $($ssHits -join '/'), expected 1/1/1")
+            }
+        }
+    }
+} catch {
+    Write-Log "auto-save-state: ending-awareness patch failed, continuing anyway - $($_.Exception.Message)"
+}
+
+# Post-process uosc: icon font family must match the shipped uosc_icons.ttf.
+# uosc 5.13 requests 'MaterialIconsRound-Regular' but the font it ships declares
+# 'Material Symbols Rounded'; with no match, ligature names render as raw text
+# ("chevron_right" instead of the glyph). Idempotent: skips if already aligned.
+try {
+    $uoscAssPath = Join-Path $ConfigDir 'scripts\uosc\lib\ass.lua'
+    if (Test-Path $uoscAssPath) {
+        # ReadAllText (UTF-8) — Get-Content would decode as ANSI and mojibake
+        # the file's non-ASCII bytes on write-back.
+        $assContent = [System.IO.File]::ReadAllText($uoscAssPath)
+        if ($assContent -match "'Material Symbols Rounded'") {
+            # already aligned, skip
+        } elseif ($assContent -match "'MaterialIconsRound-Regular'") {
+            Write-Log 'uosc: aligning icon font family with shipped uosc_icons.ttf'
+            $assContent = $assContent.Replace("'MaterialIconsRound-Regular'", "'Material Symbols Rounded'")
+            $assTmp = "$uoscAssPath.$([guid]::NewGuid().ToString('N')).tmp"
+            try {
+                [System.IO.File]::WriteAllText($assTmp, $assContent, (New-Object System.Text.UTF8Encoding($false)))
+                Move-Item -Path $assTmp -Destination $uoscAssPath -Force
+            } finally {
+                Remove-Item $assTmp -Force -ErrorAction SilentlyContinue
+            }
+        } else {
+            Write-Log 'uosc: icon-family patch skipped - neither known family string found (unexpected layout)'
+        }
+    }
+} catch {
+    Write-Log "uosc: icon-family patch failed, continuing anyway - $($_.Exception.Message)"
+}
+
 # Added 2026-09-06: wrapped in try/catch. A run on 2026-09-06 12:20 checked every
 # component successfully but never reached Save-State or the "finished" line below -
 # nothing here logged why, so a hiccup in one of these three housekeeping steps
