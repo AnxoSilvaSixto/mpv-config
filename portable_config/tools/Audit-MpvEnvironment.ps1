@@ -134,10 +134,10 @@ try {
         Fail 'input.conf Alt+h binding missing'
     } else {
         $altHLine = $altHLines[0]
-        if ($altHLine -match 'script-binding\s+hdr-toggle/toggle' -or $altHLine -match 'script-binding\s+hdr-toggle') {
-            Pass 'input.conf Alt+h points to script-binding hdr-toggle/toggle'
+        if ($altHLine -match 'script-binding\s+hdr-toggle\b(?!/)') {
+            Pass 'input.conf Alt+h points to script-binding hdr-toggle'
         } else {
-            Fail "input.conf Alt+h does not point to script-binding hdr-toggle/toggle: $altHLine"
+            Fail "input.conf Alt+h does not point to script-binding hdr-toggle: $altHLine"
         }
         # Must not still contain old 9-del chain (detect known hdr-toys shader names on Alt+h line)
         $hasOldChain = $false

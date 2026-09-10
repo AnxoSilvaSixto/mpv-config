@@ -2,6 +2,8 @@
 
 A Windows portable mpv configuration tuned for the current machine: Ryzen 7 5700X, RTX 5080, 16 GB RAM, and a ViewSonic XG2703-GS at 2560x1440/165 Hz. It is a reference configuration, not a universal recommendation.
 
+Paths shown use `C:\mpv` as an example — the actual root is auto-derived from wherever you place this folder.
+
 ## Layout
 
 ```
@@ -77,7 +79,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\mpv\portable_config\t
 Start-ScheduledTask -TaskName mpv-autoupdate
 ```
 
-> **Legacy installer removed in 2026-09** — `installer/updater.ps1` and `settings.xml` were removed; `updater.bat` → `portable_config/tools/Update-MpvEnvironment.ps1` is the sole updater. Never paste personal GitHub or service credentials into tracked files.
+> The sole updater is `updater.bat` → `portable_config/tools/Update-MpvEnvironment.ps1`.
+
+Never paste personal GitHub or service credentials into tracked files.
 
 ## Validation
 
@@ -105,7 +109,7 @@ The vendored uosc source contains an OpenSubtitles API-key field in its upstream
 
 ## Sources
 
-- [mpv](https://mpv.io)
+- [mpv](https://mpv.io) — [manual](https://mpv.io/manual/master/)
 - [uosc](https://github.com/tomasklaen/uosc)
 - [thumbfast](https://github.com/po5/thumbfast)
 - [hdr-toys](https://github.com/natural-harmonia-gropius/hdr-toys)

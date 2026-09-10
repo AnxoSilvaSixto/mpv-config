@@ -1,8 +1,9 @@
 # mpv portable config
 
-# Binaries (managed by updater.bat / installer/updater.ps1)
+# Binaries (managed by updater.bat)
 mpv.exe
 mpv.com
+fonts.conf
 
 # Auto-generated cache (shader cache, watch_later)
 portable_config/cache/

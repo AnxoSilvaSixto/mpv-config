@@ -13,4 +13,14 @@ if %errorlevel% equ 0 (
     :: pwsh is not in PATH, run the script using Windows PowerShell
     powershell -NoProfile -NoLogo -ExecutionPolicy Bypass -File %updater_script%
 )
+
+:: Capture the updater result now — a trailing command would clobber %errorlevel%.
+set updater_failed=%errorlevel%
+
+:: Failures pause indefinitely so the error stays visible; success auto-closes.
+if %updater_failed% neq 0 (
+    echo Update failed with error %updater_failed% - leaving window open.
+    pause
+    exit /b %updater_failed%
+)
 timeout 5

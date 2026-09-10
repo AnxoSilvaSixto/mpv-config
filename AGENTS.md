@@ -4,6 +4,8 @@
 
 > Hardware context: Tuned for **RTX 5080 + Vulkan + 1440p 165 Hz + Zen 3 x86_64-v3** (Ryzen 7 5700X). Config is **SDR-only, faithful reconstruction of source, no stylization**. Use as reference — adjust for other hardware. All paths assume `C:\mpv` as root.
 
+Paths shown use `C:\mpv` as an example — the actual root is auto-derived from wherever you place this folder.
+
 ---
 
 ## 1. Directory Structure
@@ -74,12 +76,12 @@ C:\mpv\
 | Entry | Purpose | Touches |
 |-------|---------|---------|
 | `updater.bat` → `portable_config/tools/Update-MpvEnvironment.ps1` | **sole updater** (mpv + hdr-toys + uosc + thumbfast + animebuild scripts) | `mpv.exe`, `shaders/hdr-toys/`, `hdr-toys.conf`, `scripts/uosc/`, `fonts/`, `scripts/thumbfast.lua` |
-> **Legacy installer removed in 2026-09** — `installer/updater.ps1` removed; `updater.bat` → `Update-MpvEnvironment.ps1` is the sole updater.
+> The sole updater is `updater.bat` → `Update-MpvEnvironment.ps1`.
 
 - `Update-MpvEnvironment.ps1` is safe to run every login; unchanged day = API checks only, state in `tools/update-state.json` (ignored). Never touches `mpv.conf`/`input.conf`/`script-opts/`.
 - mpv asset is **x86_64-v3 only** (Zen 3); if no v3 asset exists in a release, updater waits — no silent fallback to baseline.
 - Scheduled task: `Register-MpvAutoupdate.ps1` registers `mpv-autoupdate` (AtLogOn + 1 min delay, mutex `Global\mpv-autoupdate-lock` prevents overlap).
-- Legacy `settings.xml` was removed in 2026-09 (arch is now hard-coded v3 in updater).
+- Updater arch is hard-coded to x86_64-v3 in the script (no settings file).
 
 ---
 
@@ -87,7 +89,7 @@ C:\mpv\
 
 - **mpv.conf:** `vo=gpu-next` + `gpu-api=vulkan`, `hwdec=auto-safe`, `profile=high-quality`, `target` colorspace via profiles. All `Res-*` profiles use `profile-restore=copy` and nil-guarded `height` conditions; `include` for `hdr-toys.conf` must stay before any profile. Res profiles: SD (<700) → ravu/CfL/SSim, 720p 2× (700–739) → ArtCNN/CfL/SSim, fractional (740–1339) → ravu/CfL/SSim, near-native (1340–1439) → CfL/SSim, downscale (≥1440) → CfL/SSim + ewa_lanczos. Colorspace: BT.709/NTSC/PAL/gray + `[ending]` with `get("duration",0)>0` guard to avoid idle save.
 - **HDR is local choice, not proof:** Windows/monitor path may still be SDR — test real HDR content separately. `hdr-toys` tone-mapping is optional tuning, `Alt+h` restores native.
-- **input.conf:** Preserve `MBTN_RIGHT` + `MENU` → `uosc/menu` or right-click menu breaks. `#!` comments define menu paths. `Alt+h` is now `script-binding hdr-toggle/toggle` (filters any `hdr-toys` shader, reload file to restore). `Alt+d` toggles deband, `Alt+n`/`Alt+Shift+n` prepend/remove `nlmeans.glsl` (denoise before upscale).
+- **input.conf:** Preserve `MBTN_RIGHT` + `MENU` → `uosc/menu` or right-click menu breaks. `#!` comments define menu paths. `Alt+h` is now `script-binding hdr-toggle` (filters any `hdr-toys` shader, reload file to restore). `Alt+d` toggles deband, `Alt+n`/`Alt+Shift+n` prepend/remove `nlmeans.glsl` (denoise before upscale).
 - **script-opts:** `uosc.conf` — **NieR:Automata palette** (`foreground=e8dcc7/background=3a3528/curtain=c8c2aa/success=6a9f3e/error=c44536/match=c9944b`, `opacity 0.85`, `scale 1.2/1.56`, `timeline_size 40`, `chapter_ranges` with multilingual patterns, `autoload=no`). `thumbfast.conf` — `max 400×400`, `tone_mapping=mobius` (not `auto`), `hwdec=yes`, `overlay_id=42`. `changerefresh.conf` — `rates` must keep `165`, `auto=yes`, `original_width/height/rate` for revert.
 - **shaders/scripts:** Never hand-edit `hdr-toys/`; SSim shaders use LFS-free plain text. uosc/thumbfast are vendored via updater — local patches only for `display/change-refresh.lua` (Set-RefreshRate integration).
 
