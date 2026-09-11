@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Daily updater for mpv, hdr-toys, uosc, thumbfast, anime-build (mpvSockets, skip_intro, track-selector, SSim) and Ulysses auto-save-state.
+    Daily updater for mpv, hdr-toys, uosc, thumbfast, anime-build (mpvSockets, skip_intro, track-selector, SSim).
 .DESCRIPTION
     Checks each of the six against its upstream source and only downloads
     when something actually changed - safe to run on every login, since an
@@ -43,8 +43,6 @@ $UoscRepo      = 'tomasklaen/uosc'                                # upstream uos
 $ThumbfastRepo = 'po5/thumbfast'                                  # single file at the repo root - verified default branch below, 2026-08-19
 $AnimeBuildRepo = 'Chinna95P/mpv-anime-build'                     # vendored mpvSockets.lua + skip_intro.lua + track-selector.lua + SSim shaders - branch 'main' (not $Branch)
 $AnimeBuildBranch = 'main'                                        # Chinna95P default branch; kept separate so $Branch ('master') stays untouched
-$UlyssesRepo = 'popeyeurs/ulyssescaballes-mpv.config'              # auto-save-state.lua - branch 'main'
-$UlyssesBranch = 'main'
 $Branch        = 'master'                                         # default branch for hdr-toys and thumbfast; uosc overrides via -RepoBranch 'main'
 
 # ===== AGENTS.md: Chinna95P/mpv-anime-build vendored scripts (Fix 3, 2026-09-07) =====
@@ -77,7 +75,7 @@ function Write-Log {
 
 function Get-State {
     # State = last-installed version/commit per component, so unchanged days do zero downloading.
-    $defaults = [pscustomobject]@{ mpv = ''; hdrtoys = ''; uosc = ''; thumbfast = ''; animebuild = ''; ulysses = '' }
+    $defaults = [pscustomobject]@{ mpv = ''; hdrtoys = ''; uosc = ''; thumbfast = ''; animebuild = '' }
     if (Test-Path $StateFile) {
         try {
             $loaded = Get-Content $StateFile -Raw | ConvertFrom-Json -ErrorAction Stop
@@ -327,10 +325,12 @@ Update-GitFolder -Repo $AnimeBuildRepo -StateKey 'animebuild' -RepoBranch $Anime
     @{ Source = 'shaders\SSimDownscaler.glsl'; Dest = 'shaders\SSimDownscaler.glsl'; IsDir = $false }
 )
 
-# Ulysses auto-save-state (2026-09-08): single file from popeyeurs config
-Update-GitFolder -Repo $UlyssesRepo -StateKey 'ulysses' -RepoBranch $UlyssesBranch -Paths @(
-    @{ Source = 'portable_config\scripts\auto-save-state.lua'; Dest = 'scripts\auto-save-state.lua'; IsDir = $false }
-)
+# auto-save-state.lua is OWNED LOCALLY (frozen 2026-09-11): no longer synced, so
+# upstream rewrites can never clobber the ending-window awareness ([ending] owns
+# last 60s). Upstream source, for manual monitoring only:
+# https://github.com/popeyeurs/ulyssescaballes-mpv.config/blob/main/portable_config/scripts/auto-save-state.lua
+# To adopt an upstream change: diff, port what matters, re-apply the ending
+# guards, then verify with tests/test-session.ps1.
 
 # Post-process track-selector to preserve es dub -> no subs patch (faithful to slang=es)
 # If upstream overwrote our es block, re-inject it. Idempotent: only patches if marker missing.
@@ -412,66 +412,6 @@ try {
     Write-Log "track-selector: teardown-guard patch failed, continuing anyway - $($_.Exception.Message)"
 }
 
-# Post-process auto-save-state: ending-window awareness ([ending] owns last 60s).
-# Idempotent: only patches if marker missing.
-try {
-    $saveStatePath = Join-Path $ConfigDir 'scripts\auto-save-state.lua'
-    if (Test-Path $saveStatePath) {
-        # ReadAllText keeps UTF-8 round-trip safe (see uosc block below).
-        $ssContent = [System.IO.File]::ReadAllText($saveStatePath)
-        if ($ssContent -match '_ending_aware_patched') {
-            # already patched, skip
-        } else {
-            $ssOld1 = 'mp.options.read_options(options, "auto-save-state")
-
-mp.set_property("save-position-on-quit", "yes")'
-            $ssNew1 = 'mp.options.read_options(options, "auto-save-state")
-
--- Ending-window awareness (mirrors the [ending] auto-profile: last 60s of a
--- file). This script must not re-save position -- or re-enable core saving --
--- where [ending] deliberately disabled it. Marker: _ending_aware_patched
-local function in_ending_window()
-    local dur = mp.get_property_number("duration", 0)
-    if dur <= 0 then return false end
-    return mp.get_property_number("time-remaining", 9999) <= 60
-end
-
-if not in_ending_window() then mp.set_property("save-position-on-quit", "yes") end'
-            $ssOld2 = 'local function save()
-    if not idle and (not eof_reached or eof_reached and not options.delete_finished) then'
-            $ssNew2 = 'local function save()
-    -- [ending] owns the last 60s: freeze the entry (no writes) instead of
-    -- refreshing it; core skips its own quit-save there via save-position=no.
-    if in_ending_window() then return end
-    if not idle and (not eof_reached or eof_reached and not options.delete_finished) then'
-            $ssOld3 = '        eof_reached = false
-        mp.set_property("save-position-on-quit", "yes")'
-            $ssNew3 = '        eof_reached = false
-        if not in_ending_window() then mp.set_property("save-position-on-quit", "yes") end'
-            $ssHits = @(
-                ([regex]::Matches($ssContent, [regex]::Escape($ssOld1))).Count,
-                ([regex]::Matches($ssContent, [regex]::Escape($ssOld2))).Count,
-                ([regex]::Matches($ssContent, [regex]::Escape($ssOld3))).Count
-            )
-            if (($ssHits[0] -eq 1) -and ($ssHits[1] -eq 1) -and ($ssHits[2] -eq 1)) {
-                Write-Log 'auto-save-state: adding ending-window awareness ([ending] owns last 60s)'
-                $ssContent = $ssContent.Replace($ssOld1, $ssNew1).Replace($ssOld2, $ssNew2).Replace($ssOld3, $ssNew3)
-                $ssTmp = "$saveStatePath.$([guid]::NewGuid().ToString('N')).tmp"
-                try {
-                    [System.IO.File]::WriteAllText($ssTmp, $ssContent, (New-Object System.Text.UTF8Encoding($false)))
-                    Move-Item -Path $ssTmp -Destination $saveStatePath -Force
-                } finally {
-                    Remove-Item $ssTmp -Force -ErrorAction SilentlyContinue
-                }
-            } else {
-                Write-Log ("auto-save-state: ending-awareness skipped - anchors found $($ssHits -join '/'), expected 1/1/1")
-            }
-        }
-    }
-} catch {
-    Write-Log "auto-save-state: ending-awareness patch failed, continuing anyway - $($_.Exception.Message)"
-}
-
 # Post-process uosc: icon font family must match the shipped uosc_icons.ttf.
 # uosc 5.13 requests 'MaterialIconsRound-Regular' but the font it ships declares
 # 'Material Symbols Rounded'; with no match, ligature names render as raw text
@@ -500,6 +440,103 @@ try {
     }
 } catch {
     Write-Log "uosc: icon-family patch failed, continuing anyway - $($_.Exception.Message)"
+}
+
+# Post-process portable launchers: the mpv build archive overwrites updater.bat
+# and mpv-register/unregister.bat on every mpv release (robocopy /E over root).
+# Re-apply our tweaks when the stock lines are found; skip when already applied.
+# Line-anchored (never multi-line) with EOL detection: immune to LF/CRLF flips
+# between archive versions. Idempotent per file; fail-loud per file.
+try {
+    $launcherJobs = @(
+        @{ File = 'updater.bat'; Marker = 'updater_failed' },
+        @{ File = 'mpv-register.bat'; Marker = '%~dp0mpv' },
+        @{ File = 'mpv-unregister.bat'; Marker = '%~dp0mpv' }
+    )
+    foreach ($job in $launcherJobs) {
+        $lp = Join-Path $MpvRoot $job.File
+        if (-not (Test-Path $lp)) { continue }
+        $lt = [System.IO.File]::ReadAllText($lp)
+        if ($lt.Contains($job.Marker)) { continue }  # already ours, skip
+        $nl = "`n"; if ($lt.Contains("`r`n")) { $nl = "`r`n" }
+        $lines = $lt -split "`r?`n"
+        while ($lines.Count -gt 0 -and $lines[$lines.Count - 1] -eq '') {
+            if ($lines.Count -eq 1) { $lines = @(); break }
+            $lines = $lines[0..($lines.Count - 2)]
+        }
+        function Find-Lines($want) {
+            $idx = @()
+            for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -ceq $want) { $idx += $i } }
+            return $idx
+        }
+        $new = $null; $why = ''
+        if ($job.File -eq 'updater.bat') {
+            $capAt = Find-Lines ':: After update, updater.ps1 should not in same folder as mpv.exe'
+            $gateAt = Find-Lines 'timeout 5'
+            if ($capAt.Count -ne 1 -or $gateAt.Count -ne 1 -or $gateAt[0] -le $capAt[0]) {
+                $why = 'anchors not unique/found'
+            } else {
+                $new = @()
+                for ($i = 0; $i -lt $lines.Count; $i++) {
+                    if ($i -eq $capAt[0]) {
+                        $new += ':: Capture the updater result now - later commands (del) would clobber %errorlevel%.'
+                        $new += 'set updater_failed=%errorlevel%'
+                        $new += ''
+                    }
+                    if ($i -eq $gateAt[0]) {
+                        $new += ':: Failures pause indefinitely so the error stays visible; success auto-closes.'
+                        $new += 'if %updater_failed% neq 0 ('
+                        $new += '    echo Update failed with error %updater_failed% - leaving window open.'
+                        $new += '    pause'
+                        $new += '    exit /b %updater_failed%'
+                        $new += ')'
+                        $new += ''
+                    }
+                    $new += $lines[$i]
+                }
+            }
+                if (($new -join "`n") -notmatch 'Update-MpvEnvironment') {
+                    Write-Log 'WARNING: updater.bat does not dispatch to Update-MpvEnvironment.ps1 - Option-A dispatch needs manual restore'
+                }
+        } else {
+            $verb = 'register'; if ($job.File -match 'unregister') { $verb = 'unregister' }
+            $at = Find-Lines ("`"%~dp0/mpv`" --" + $verb)
+            if ($at.Count -ne 1) {
+                $why = 'anchor not unique/found'
+            } else {
+                $new = @()
+                for ($i = 0; $i -lt $lines.Count; $i++) {
+                    if ($i -eq $at[0]) {
+                        if ($verb -eq 'register') {
+                            $new += ':: --register writes registry keys tied to the CURRENT folder path - re-run this'
+                            $new += ":: after moving the portable install; this is the one piece that isn't portable by design."
+                        } else {
+                            $new += ':: --unregister removes registry keys tied to the CURRENT folder path - re-run'
+                            $new += ":: mpv-register.bat after moving the portable install; this is the one piece that isn't portable by design."
+                        }
+                        $new += ($lines[$i] -replace '%~dp0/mpv', '%~dp0mpv')
+                    } else {
+                        $new += $lines[$i]
+                    }
+                }
+            }
+        }
+        if ($new -eq $null) {
+            Write-Log "$($job.File): launcher patch skipped - $why"
+        } else {
+            Write-Log "$($job.File): re-applying local tweaks over mpv-extract version"
+            $text = ($new -join $nl) + $nl
+            $ltTmp = "$lp.$([guid]::NewGuid().ToString('N')).tmp"
+            try {
+                [System.IO.File]::WriteAllText($ltTmp, $text, (New-Object System.Text.UTF8Encoding($false)))
+                Move-Item -Path $ltTmp -Destination $lp -Force
+            } finally {
+                Remove-Item $ltTmp -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+} catch {
+    Write-Log "launcher tweaks patch failed, continuing anyway - $($_.Exception.Message)"
 }
 
 # Added 2026-09-06: wrapped in try/catch. A run on 2026-09-06 12:20 checked every

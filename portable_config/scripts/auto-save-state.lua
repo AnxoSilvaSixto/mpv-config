@@ -1,3 +1,5 @@
+-- Owned locally (frozen 2026-09-11, not auto-synced): upstream
+-- https://github.com/popeyeurs/ulyssescaballes-mpv.config/blob/main/portable_config/scripts/auto-save-state.lua
 -- Save state in multiple scenarios and control deletion
 local options = {
     timer_enabled = true,

@@ -18,7 +18,7 @@ C:\mpv\
 │   ├── input.conf                # custom bindings only; uosc handles rest
 │   ├── scripts/
 │   │   ├── hdr-toggle.lua        # native tone-mapping fallback (Alt+h)
-│   │   ├── auto-save-state.lua   # watch-later every 1s (Ulysses)
+│   │   ├── auto-save-state.lua   # watch-later every 1s (owned locally, frozen; upstream kept as link only)
 │   │   ├── track-selector.lua    # commentary-safe select (Chinna95P, es dub patch)
 │   │   ├── thumbfast.lua         # top-level thumbfast (po5) — required for uosc thumbnails
 │   │   ├── uosc/                 # UI (tomasklaen/uosc) — main.lua + elements/lib/intl/char-conv
@@ -79,7 +79,7 @@ C:\mpv\
 > The sole updater is `updater.bat` → `Update-MpvEnvironment.ps1`.
 
 - `Update-MpvEnvironment.ps1` is safe to run every login; unchanged day = API checks only, state in `tools/update-state.json` (ignored). Never touches `mpv.conf`/`input.conf`/`script-opts/`.
-- Vendored-file local patches live as updater post-process blocks (track-selector es-dub + EOF-t...[truncated]
+- Vendored-file local patches live as updater post-process blocks (track-selector es-dub guard, uosc icon family, launcher tweaks); auto-save-state.lua is frozen locally and no longer synced.
 - mpv asset is **x86_64-v3 only** (Zen 3); if no v3 asset exists in a release, updater waits — no silent fallback to baseline.
 - Scheduled task: `Register-MpvAutoupdate.ps1` registers `mpv-autoupdate` (AtLogOn + 1 min delay, mutex `Global\mpv-autoupdate-lock` prevents overlap).
 - Updater arch is hard-coded to x86_64-v3 in the script (no settings file).
