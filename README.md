@@ -18,7 +18,7 @@ C:\mpv\
 │   ├── input.conf                     # local key bindings and uosc menu entries (Alt+h → hdr-toggle)
 │   ├── scripts/
 │   │   ├── hdr-toggle.lua             # native tone-mapping fallback (Alt+h)
-│   │   ├── auto-save-state.lua        # watch-later persist (Ulysses)
+│   │   ├── auto-save-state.lua        # watch-later persist (owned locally, frozen)
 │   │   ├── track-selector.lua         # commentary-safe select (Chinna95P, es dub patch)
 │   │   ├── thumbfast.lua              # top-level thumbfast (po5) — required for uosc
 │   │   ├── uosc/                      # UI and bundled modules
@@ -68,7 +68,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\mpv\portable_config\t
 
 Primary entry point is `updater.bat` (double-click) → `portable_config/tools/Update-MpvEnvironment.ps1`. The script derives the root from its own location and checks mpv, hdr-toys, uosc, thumbfast, and two anime-build scripts against their upstream sources. It writes state only after a component's download, extraction, and copy completes successfully. `portable_config/tools/update-state.json` is written through a temporary file and replacement; a malformed state file is treated as empty state and logged. A failed component is retried on the next run.
 
-It does not overwrite `mpv.conf`, `input.conf`, `script-opts`, or unrelated config. Local patches to vendored files (track-selector, auto-save-state, uosc icons) are re-applied by idempotent post-process blocks inside the updater itself, so they survive re-syncs. It may clean old shader-cache/watch-later files and rotate its ignored update log. The mpv release step needs 7-Zip and intentionally selects the x86_64-v3 asset for the Ryzen 7 5700X; it does not silently fall back to a baseline asset.
+It does not overwrite `mpv.conf`, `input.conf`, `script-opts`, or unrelated config. Local patches to vendored files (track-selector, uosc icons, launcher bats) are re-applied by idempotent post-process blocks inside the updater itself, so they survive re-syncs; auto-save-state.lua is frozen locally and no longer synced. It may clean old shader-cache/watch-later files and rotate its ignored update log. The mpv release step needs 7-Zip and intentionally selects the x86_64-v3 asset for the Ryzen 7 5700X; it does not silently fall back to a baseline asset.
 
 Rollback is manual: stop mpv, restore the affected file or directory from a known-good backup, and restore the matching component value in the ignored state JSON (or delete that component's state entry/file to force a re-download). Keep a backup before accepting an upstream replacement. The updater is not a transaction across all components: a successful component can remain updated if a later component fails.
 
@@ -115,7 +115,7 @@ The vendored uosc source contains an OpenSubtitles API-key field in its upstream
 - [hdr-toys](https://github.com/natural-harmonia-gropius/hdr-toys)
 - [mpv-sub-select](https://github.com/CogentRedTester/mpv-sub-select)
 - [track-selector](https://github.com/Chinna95P/mpv-anime-build/blob/main/scripts/track-selector.lua) — commentary-safe audio/subs (Chinna95P, es dub patch)
-- [auto-save-state](https://github.com/popeyeurs/ulyssescaballes-mpv.config/blob/main/portable_config/scripts/auto-save-state.lua) — watch-later every 1s (Ulysses Caballes)
+- [auto-save-state](https://github.com/popeyeurs/ulyssescaballes-mpv.config/blob/main/portable_config/scripts/auto-save-state.lua) — watch-later every 1s (frozen locally; upstream link kept for manual monitoring)
 - [SSimSuperRes / SSimDownscaler](https://github.com/Chinna95P/mpv-anime-build/blob/main/shaders/SSimSuperRes.glsl) — anti-ringing helpers by Shiandow (via Chinna95P)
 - [ravu-zoom](https://github.com/bjin/mpv-prescalers) — faithful adaptive upscaler (r4 fallback copy, bjin 404)
 - [ArtCNN](https://github.com/Artoriuz/ArtCNN) — exact 2x for 720p→1440p

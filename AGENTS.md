@@ -135,7 +135,7 @@ git status --porcelain | Select-String "mpv\.exe|mpv\.com|cache/|update-"
 
 ## 8. Sources & Git
 
-- Upstreams: [mpv](https://mpv.io) / [zhongfly/mpv-winbuild](https://github.com/zhongfly/mpv-winbuild), [uosc](https://github.com/tomasklaen/uosc), [thumbfast](https://github.com/po5/thumbfast), [hdr-toys](https://github.com/natural-harmonia-gropius/hdr-toys), [ArtCNN](https://github.com/Artoriuz/ArtCNN), [ravu](https://github.com/bjin/mpv-prescalers), [track-selector](https://github.com/Chinna95P/mpv-anime-build), [auto-save-state](https://github.com/popeyeurs/ulyssescaballes-mpv.config), SSim (Shiandow via Chinna95P).
+- Upstreams: [mpv](https://mpv.io) / [zhongfly/mpv-winbuild](https://github.com/zhongfly/mpv-winbuild), [uosc](https://github.com/tomasklaen/uosc), [thumbfast](https://github.com/po5/thumbfast), [hdr-toys](https://github.com/natural-harmonia-gropius/hdr-toys), [ArtCNN](https://github.com/Artoriuz/ArtCNN), [ravu](https://github.com/bjin/mpv-prescalers), [track-selector](https://github.com/Chinna95P/mpv-anime-build), [auto-save-state](https://github.com/popeyeurs/ulyssescaballes-mpv.config) (link only, frozen), SSim (Shiandow via Chinna95P).
 - Commits: `docs:`/`chore:`/`fix:` style, ~72 chars. Don't create `plan` files under `.opencode/`.
 - Docs budget: keep `AGENTS.md` <200 lines and `README.md` concise — remove stale refs and duplicate narration.
 
