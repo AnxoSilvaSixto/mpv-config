@@ -412,7 +412,22 @@ try {
     Write-Log "track-selector: teardown-guard patch failed, continuing anyway - $($_.Exception.Message)"
 }
 
-# Post-process uosc: icon font family must match the shipped uosc_icons.ttf.
+# Post-process track-selector: warn if the end-file/shutdown mute is absent
+# (the eof_guard block above re-applies automatically and remains the primary
+# teardown defense; the mute is an extra that a sync may drop).
+# Idempotent: silent when the marker is present.
+try {
+    if (Test-Path $trackSelectorPath) {
+        $tsMuteContent = [System.IO.File]::ReadAllText($trackSelectorPath)
+        if ($tsMuteContent -match '_teardown_mute_patched') {
+            # already muted, skip
+        } else {
+            Write-Log 'track-selector: WARNING end-file mute missing'
+        }
+    }
+} catch {
+    Write-Log "track-selector: teardown-mute patch failed, continuing anyway - $($_.Exception.Message)"
+}
 # uosc 5.13 requests 'MaterialIconsRound-Regular' but the font it ships declares
 # 'Material Symbols Rounded'; with no match, ligature names render as raw text
 # ("chevron_right" instead of the glyph). Idempotent: skips if already aligned.

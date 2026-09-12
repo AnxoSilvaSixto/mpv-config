@@ -766,7 +766,7 @@ mp.register_event("start-file", function()
     internal_sid_change = nil
 end)
 
--- Teardown mirror of start-file: at end-file, profile-restore unloads tracks
+-- Teardown mirror of start-file (_teardown_mute_patched): at end-file, profile-restore unloads tracks
 -- on the way out and the aid/sid observers would read that as a user action
 -- (bogus "manual override", also persisted). Mute them here; the next
 -- start-file re-arms detection. Shutdown does the same for process exit.
