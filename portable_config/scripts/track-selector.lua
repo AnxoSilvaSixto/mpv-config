@@ -567,12 +567,12 @@ local function select_smart_tracks()
         end
     end
 
-    -- faithful to user slang=es prioritization: if we selected Spanish audio, don't show subs
-    if selected_audio_lang and selected_audio_lang:find("^es") then
-        msg.info("Smart Sub: Spanish audio detected (" .. selected_audio_lang .. ") -> disabling subs per es dub rule")
-        if mp.get_property("sid") ~= "no" then
-            mark_internal_change("subtitle", "no")
-            mp.set_property("sid", "no")
+        -- faithful to user slang=es prioritization: if we selected Spanish audio, don't show subs
+    if selected_audio_lang and selected_audio_lang:find('^es') then
+        msg.info('Smart Sub: Spanish audio detected (' .. selected_audio_lang .. ') -> disabling subs per es dub rule')
+        if mp.get_property('sid') ~= 'no' then
+            mark_internal_change('subtitle', 'no')
+            mp.set_property('sid', 'no')
         end
         return
     end
@@ -766,19 +766,30 @@ mp.register_event("start-file", function()
     internal_sid_change = nil
 end)
 
+-- Teardown mirror of start-file: at end-file, profile-restore unloads tracks
+-- on the way out and the aid/sid observers would read that as a user action
+-- (bogus "manual override", also persisted). Mute them here; the next
+-- start-file re-arms detection. Shutdown does the same for process exit.
+mp.register_event("end-file", function()
+    ignore_track_changes = true
+end)
+mp.register_event("shutdown", function()
+    ignore_track_changes = true
+end)
+
 mp.observe_property("aid", "string", function(name, val)
     if not track_selector_enabled or ignore_track_changes or file_transition then
+        return
+    end
+
+    if internal_aid_change and val == internal_aid_change then
+        internal_aid_change = nil
         return
     end
     -- Teardown guard (_eof_guard_patched): track-list teardown at end-file fires
     -- these observers with no active file -- never misclassify that as a manual change.
     if mp.get_property("path") == nil or mp.get_property_native("core-idle")
             or #(mp.get_property_native("track-list") or {}) == 0 then
-        return
-    end
-
-    if internal_aid_change and val == internal_aid_change then
-        internal_aid_change = nil
         return
     end
 
@@ -793,15 +804,15 @@ mp.observe_property("sid", "string", function(name, val)
     if not track_selector_enabled or ignore_track_changes or file_transition then
         return
     end
+
+    if internal_sid_change and val == internal_sid_change then
+        internal_sid_change = nil
+        return
+    end
     -- Teardown guard (_eof_guard_patched): track-list teardown at end-file fires
     -- these observers with no active file -- never misclassify that as a manual change.
     if mp.get_property("path") == nil or mp.get_property_native("core-idle")
             or #(mp.get_property_native("track-list") or {}) == 0 then
-        return
-    end
-
-    if internal_sid_change and val == internal_sid_change then
-        internal_sid_change = nil
         return
     end
 
