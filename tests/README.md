@@ -14,6 +14,10 @@ outside this dir except mpv itself (`../mpv.com`) and the portable config.
 - Benchmark: `bench/bench-shaders.ps1` (stock smoke on the 4 real clips runs
   as the last run-all step; full matrix stays manual):
   `powershell -NoProfile -ExecutionPolicy Bypass -File tests/bench/bench-shaders.ps1`
+  - Branch note: switching between `main` and `tests` moves the scripts in/out
+  of the worktree; `tests/clips/` is gitignored and always stays on disk.
+  To restore the scripts on `main`: `git checkout tests -- tests/` then
+  `git reset HEAD -- tests/` (keeps them untracked).
   - Shootout verdicts: `bench/SHOOTOUT-RESULTS.md` (per-rung winners, rejections).
 
 ## Layout
