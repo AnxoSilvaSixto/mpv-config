@@ -95,9 +95,9 @@ C:\mpv\mpv.com --config-dir=C:\mpv\portable_config --idle=once --force-window=no
 
 The audit checks required paths, the standalone thumbfast layout, the `[ending]` duration guard, PowerShell syntax, JSON/XML parsing, top-level Git LFS pointers, and mpv startup log errors. A normal clone may warn about LFS pointers until `git lfs pull` is run. A real media-file test is still needed to validate profile activation, refresh switching, HDR output, subtitles, and thumbnail rendering.
 
-## Test harness (`tests` branch)
+## Test harness ([mpv-config-tests](https://github.com/AnxoSilvaSixto/mpv-config-tests))
 
-The full verification suite — audit, profile/resolution/colorspace/HDR/binding/track/seek/session/config suites, real-world anime clips, and the shader bench — lives on the [`tests` branch](https://github.com/AnxoSilvaSixto/mpv-config/tree/tests) (kept out of `main` to avoid shipping ~200 MB of clips). Check it out alongside `main` and run `powershell -NoProfile -ExecutionPolicy Bypass -File tests/run-all.ps1` (exit 0 = green). Real-clip provenance and re-cut recipes are in `tests/make-test-clips.ps1`; shootout verdicts in `tests/bench/SHOOTOUT-RESULTS.md`.
+The full verification suite — audit, profile/resolution/colorspace/HDR/binding/track/seek/session/config suites, real-world anime clips, and the shader bench — lives in its own repo (kept separate so `main` never ships ~200 MB of clips). Clone it next to this repo and run `powershell -NoProfile -ExecutionPolicy Bypass -File run-all.ps1` (exit 0 = green; `MPV_ROOT` points it at the config, default `C:/mpv`). Real-clip provenance and re-cut recipes are in `make-test-clips.ps1`; shootout verdicts in `bench/SHOOTOUT-RESULTS.md`.
 
 ## Known limitations
 
