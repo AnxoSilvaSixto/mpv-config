@@ -332,8 +332,10 @@ Update-GitFolder -Repo $AnimeBuildRepo -StateKey 'animebuild' -RepoBranch $Anime
 # To adopt an upstream change: diff, port what matters, re-apply the ending
 # guards, then verify with tests/test-session.ps1.
 
-# Post-process track-selector to preserve es dub -> no subs patch (faithful to slang=es)
+# Post-process track-selector to preserve es dub -> no subs patch (faithful to slang=es-ES priority)
 # If upstream overwrote our es block, re-inject it. Idempotent: only patches if marker missing.
+# Spanish detection is spa-aware (es-* and spa tags); variant priority (es-ES > es/spa > es-419)
+# lives in matches_lang/normalize_lang (separate post-process block below).
 try {
     $trackSelectorPath = Join-Path $ConfigDir 'scripts\track-selector.lua'
     if (Test-Path $trackSelectorPath) {
@@ -346,12 +348,12 @@ try {
             # Current layout (2026-09+): selected_audio_lang is initialized to "" then populated via loop;
             # inject before the CONTEXT DETECTION marker which exists in all recent versions.
             if ($trackContent -match "-- 2\. CONTEXT DETECTION") {
-                $esBlock = "    -- faithful to user slang=es prioritization: if we selected Spanish audio, don't show subs`r`n    if selected_audio_lang and selected_audio_lang:find('^es') then`r`n        msg.info('Smart Sub: Spanish audio detected (' .. selected_audio_lang .. ') -> disabling subs per es dub rule')`r`n        if mp.get_property('sid') ~= 'no' then`r`n            mark_internal_change('subtitle', 'no')`r`n            mp.set_property('sid', 'no')`r`n        end`r`n        return`r`n    end`r`n    local _es_patched = true`r`n`r`n    -- 2. CONTEXT DETECTION"
+                $esBlock = "    -- faithful to user slang=es-ES priority: if we selected Spanish audio, don't show subs`r`n    if selected_audio_lang and (selected_audio_lang:find('^es') or selected_audio_lang:find('^spa')) then`r`n        msg.info('Smart Sub: Spanish audio detected (' .. selected_audio_lang .. ') -> disabling subs per es dub rule')`r`n        if mp.get_property('sid') ~= 'no' then`r`n            mark_internal_change('subtitle', 'no')`r`n            mp.set_property('sid', 'no')`r`n        end`r`n        return`r`n    end`r`n    local _es_patched = true`r`n`r`n    -- 2. CONTEXT DETECTION"
                 $trackContent = $trackContent -replace "-- 2\. CONTEXT DETECTION", $esBlock
                 $trackSelectorPatched = $true
             } elseif ($trackContent -match "local selected_audio_lang = mp\.get_property\('audio-params/lang'\)") {
                 # Legacy fallback: very old file used mp.get_property('audio-params/lang') inline
-                $trackContent = $trackContent -replace "local selected_audio_lang = mp.get_property\('audio-params/lang'\)", "local selected_audio_lang = mp.get_property('audio-params/lang')`r`n    -- faithful to user slang=es prioritization: if we selected Spanish audio, don't show subs`r`n    if selected_audio_lang and selected_audio_lang:find('^es') then`r`n        msg.info('Smart Sub: Spanish audio detected (' .. selected_audio_lang .. ') -> disabling subs per es dub rule')`r`n        local selected_sid = 'no'`r`n        mark_internal_change('sid', selected_sid)`r`n        msg.info('Smart Sub: Spanish audio ...')`r`n        return`r`n    end`r`n    local _es_patched = true"
+                $trackContent = $trackContent -replace "local selected_audio_lang = mp.get_property\('audio-params/lang'\)", "local selected_audio_lang = mp.get_property('audio-params/lang')`r`n    -- faithful to user slang=es-ES priority: if we selected Spanish audio, don't show subs`r`n    if selected_audio_lang and (selected_audio_lang:find('^es') or selected_audio_lang:find('^spa')) then`r`n        msg.info('Smart Sub: Spanish audio detected (' .. selected_audio_lang .. ') -> disabling subs per es dub rule')`r`n        local selected_sid = 'no'`r`n        mark_internal_change('sid', selected_sid)`r`n        msg.info('Smart Sub: Spanish audio ...')`r`n        return`r`n    end`r`n    local _es_patched = true"
                 $trackSelectorPatched = $true
             } else {
                 Write-Log "track-selector: patch skipped - no known anchor found (unexpected layout)"
@@ -369,6 +371,97 @@ try {
     }
 } catch {
     Write-Log "track-selector: patch failed, continuing anyway so state still gets saved - $($_.Exception.Message)"
+}
+
+# Post-process track-selector: Spanish-variant priority (es-ES > es/spa > es-419).
+# Re-applies normalize_lang/matches_lang/is_spanish_lang if upstream overwrote them.
+# Idempotent: only patches if marker missing.
+try {
+    if (Test-Path $trackSelectorPath) {
+        $tsLangContent = [System.IO.File]::ReadAllText($trackSelectorPath)
+        if ($tsLangContent -match '_es_lang_priority_patched') {
+            # already patched, skip
+        } else {
+            $tsLangOld = '-- Helper to check if a track language matches a preferred language
+local function matches_lang(track_lang, pref_lang)
+    if not track_lang then return false end
+    return string.sub(track_lang, 1, string.len(pref_lang)) == pref_lang
+end'
+            $tsLangNew = '-- Spanish-variant priority (_es_lang_priority_patched): es-ES > es/spa > es-419.
+-- Normalizes ISO 639-1/2 (spa~es, eng~en, jpn~ja) so mkv "spa" tags match "es"
+-- prefs. A pref WITH a region (es-ES) requires an exact variant match; a
+-- generic pref (es) matches any same-base track. Combined with
+-- slang=es-ES,es,spa,es-419 ordering, Spain Spanish always wins over Latin.
+local function normalize_lang(lang)
+    if not lang then return "" end
+    lang = lang:lower():gsub("_", "-")
+    local base = lang:match("^([a-z]+)")
+    if base == "spa" then
+        lang = "es" .. lang:sub(4)
+    elseif base == "eng" then
+        lang = "en" .. lang:sub(4)
+    elseif base == "jpn" then
+        lang = "ja" .. lang:sub(4)
+    end
+    return lang
+end
+
+local function lang_base(norm)
+    return norm:match("^([a-z]+)") or norm
+end
+
+-- Helper to check if a track language matches a preferred language
+local function matches_lang(track_lang, pref_lang)
+    if not track_lang or not pref_lang then return false end
+    local t = normalize_lang(track_lang)
+    local p = normalize_lang(pref_lang)
+    if t == p then return true end
+    -- Generic pref (no region) matches any same-base track (es matches
+    -- es-es/es-419/spa); regional pref requires exact variant match.
+    if not p:find("-", 1, true) then
+        return lang_base(t) == p
+    end
+    return false
+end
+
+local function is_spanish_lang(lang)
+    return lang_base(normalize_lang(lang or "")) == "es"
+end
+
+-- Tiered match for deterministic variant priority: 0 = exact/equivalent
+-- (es-ES~es-ES, es~es, spa~es), 1 = base fallback (generic es pref vs es-419
+-- or es-MX track), -1 = no match. Regional prefs never fuzzy-match.
+-- NOTE: the per-pref best-tier scan in select_smart_tracks (audio, anime
+-- dialogue, clean, SDH loops) is NOT re-applied by this block; if upstream
+-- rewrites those loops, re-port the tier scan manually (see repo diff).
+local function match_tier(track_lang, pref_lang)
+    local t = normalize_lang(track_lang)
+    local p = normalize_lang(pref_lang)
+    if t == "" or p == "" then return -1 end
+    if t == p then return 0 end
+    if not p:find("-", 1, true) and lang_base(t) == p then return 1 end
+    return -1
+end'
+            if ($tsLangContent.Contains($tsLangOld)) {
+                Write-Log 'track-selector: re-applying Spanish-variant priority (es-ES > es > es-419)'
+                $tsLangContent = $tsLangContent.Replace($tsLangOld, $tsLangNew)
+                # Also make the es-dub no-subs rule spa-aware on the fresh file
+                $tsLangContent = $tsLangContent.Replace("selected_audio_lang:find('^es')", "selected_audio_lang:find('^es') or selected_audio_lang:find('^spa')")
+                $tsLangContent = $tsLangContent.Replace('slang=es prioritization', 'slang=es-ES priority')
+                $tsLangTmp = "$trackSelectorPath.$([guid]::NewGuid().ToString('N')).tmp"
+                try {
+                    [System.IO.File]::WriteAllText($tsLangTmp, $tsLangContent, (New-Object System.Text.UTF8Encoding($false)))
+                    Move-Item -Path $tsLangTmp -Destination $trackSelectorPath -Force
+                } finally {
+                    Remove-Item $tsLangTmp -Force -ErrorAction SilentlyContinue
+                }
+            } else {
+                Write-Log 'track-selector: lang-priority skipped - old matches_lang anchor not found (unexpected layout)'
+            }
+        }
+    }
+} catch {
+    Write-Log "track-selector: lang-priority patch failed, continuing anyway - $($_.Exception.Message)"
 }
 
 # Post-process track-selector: teardown guard (ignore aid/sid changes with no

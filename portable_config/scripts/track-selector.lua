@@ -215,10 +215,57 @@ local function contains_keyword(text, keywords)
     return false
 end
 
+-- Spanish-variant priority (_es_lang_priority_patched): es-ES > es/spa > es-419.
+-- Normalizes ISO 639-1/2 (spa~es, eng~en, jpn~ja) so mkv "spa" tags match "es"
+-- prefs. A pref WITH a region (es-ES) requires an exact variant match; a
+-- generic pref (es) matches any same-base track. Combined with
+-- slang=es-ES,es,spa,es-419 ordering, Spain Spanish always wins over Latin.
+local function normalize_lang(lang)
+    if not lang then return "" end
+    lang = lang:lower():gsub("_", "-")
+    local base = lang:match("^([a-z]+)")
+    if base == "spa" then
+        lang = "es" .. lang:sub(4)
+    elseif base == "eng" then
+        lang = "en" .. lang:sub(4)
+    elseif base == "jpn" then
+        lang = "ja" .. lang:sub(4)
+    end
+    return lang
+end
+
+local function lang_base(norm)
+    return norm:match("^([a-z]+)") or norm
+end
+
 -- Helper to check if a track language matches a preferred language
 local function matches_lang(track_lang, pref_lang)
-    if not track_lang then return false end
-    return string.sub(track_lang, 1, string.len(pref_lang)) == pref_lang
+    if not track_lang or not pref_lang then return false end
+    local t = normalize_lang(track_lang)
+    local p = normalize_lang(pref_lang)
+    if t == p then return true end
+    -- Generic pref (no region) matches any same-base track (es matches
+    -- es-es/es-419/spa); regional pref requires exact variant match.
+    if not p:find("-", 1, true) then
+        return lang_base(t) == p
+    end
+    return false
+end
+
+local function is_spanish_lang(lang)
+    return lang_base(normalize_lang(lang or "")) == "es"
+end
+
+-- Tiered match for deterministic variant priority: 0 = exact/equivalent
+-- (es-ES~es-ES, es~es, spa~es), 1 = base fallback (generic es pref vs es-419
+-- or es-MX track), -1 = no match. Regional prefs never fuzzy-match.
+local function match_tier(track_lang, pref_lang)
+    local t = normalize_lang(track_lang)
+    local p = normalize_lang(pref_lang)
+    if t == "" or p == "" then return -1 end
+    if t == p then return 0 end
+    if not p:find("-", 1, true) and lang_base(t) == p then return 1 end
+    return -1
 end
 
 -- Helper to verify if the file contains actual moving video
@@ -529,20 +576,25 @@ local function select_smart_tracks()
 
     local selected_aid = nil
 
-    -- 1. AUDIO SELECTION LOGIC
+    -- 1. AUDIO SELECTION LOGIC (per-pref best-tier scan: exact beats base
+    -- fallback, so generic es never loses to es-419 on file order)
     for _, pref_lang in ipairs(pref_audio_langs) do
+        local best, best_tier = nil, 2
         for _, t in ipairs(tracks) do
-            if t.type == "audio" and not selected_aid then
+            if t.type == "audio" then
                 local lang = (t.lang or ""):lower()
                 local title = (t.title or ""):lower()
+                local tier = match_tier(lang, pref_lang)
 
-                if matches_lang(lang, pref_lang) and not contains_keyword(title, ignore_audio) then
-                    selected_aid = apply_audio(t.id, "Selected " .. lang)
-                    break
+                if tier >= 0 and tier < best_tier and not contains_keyword(title, ignore_audio) then
+                    best, best_tier = t, tier
                 end
             end
         end
-        if selected_aid then break end
+        if best then
+            selected_aid = apply_audio(best.id, "Selected " .. (best.lang or ""))
+            break
+        end
     end
 
     if not selected_aid then
@@ -567,8 +619,8 @@ local function select_smart_tracks()
         end
     end
 
-        -- faithful to user slang=es prioritization: if we selected Spanish audio, don't show subs
-    if selected_audio_lang and selected_audio_lang:find('^es') then
+        -- faithful to user slang=es-ES priority: if we selected Spanish audio, don't show subs
+    if selected_audio_lang and is_spanish_lang(selected_audio_lang) then
         msg.info('Smart Sub: Spanish audio detected (' .. selected_audio_lang .. ') -> disabling subs per es dub rule')
         if mp.get_property('sid') ~= 'no' then
             mark_internal_change('subtitle', 'no')
@@ -612,56 +664,66 @@ local function select_smart_tracks()
 
     if is_anime_context and not selected_sid then
         for _, pref_lang in ipairs(pref_sub_langs) do
+            local best, best_tier = nil, 2
             for _, t in ipairs(tracks) do
-                if t.type == "sub" and not selected_sid then
+                if t.type == "sub" then
                     local lang = (t.lang or ""):lower()
                     local title = (t.title or ""):lower()
-                    if matches_lang(lang, pref_lang) then
+                    local tier = match_tier(lang, pref_lang)
+                    if tier >= 0 and tier < best_tier then
                         if (title:find("dialogue") or title:find("full") or title:find("script"))
                                 and not track_is_ignored_auto_subtitle(t) then
-                            selected_sid = apply_sub(t.id, "Anime Dialogue matched (Slang)")
-                            break
+                            best, best_tier = t, tier
                         end
                     end
                 end
             end
-            if selected_sid then break end
+            if best then
+                selected_sid = apply_sub(best.id, "Anime Dialogue matched (Slang)")
+                break
+            end
         end
     end
 
     if not selected_sid then
         for _, pref_lang in ipairs(pref_sub_langs) do
+            local best, best_tier = nil, 2
             for _, t in ipairs(tracks) do
-                if t.type == "sub" and not selected_sid then
-                    local lang = (t.lang or ""):lower()
-                    if matches_lang(lang, pref_lang) then
+                if t.type == "sub" then
+                    local tier = match_tier((t.lang or ""):lower(), pref_lang)
+                    if tier >= 0 and tier < best_tier then
                         if not track_is_ignored_auto_subtitle(t) then
-                            selected_sid = apply_sub(t.id, "Clean Match (Slang)")
-                            break
+                            best, best_tier = t, tier
                         end
                     end
                 end
             end
-            if selected_sid then break end
+            if best then
+                selected_sid = apply_sub(best.id, "Clean Match (Slang)")
+                break
+            end
         end
     end
 
     if not selected_sid then
         for _, pref_lang in ipairs(pref_sub_langs) do
+            local best, best_tier = nil, 2
             for _, t in ipairs(tracks) do
-                if t.type == "sub" and not selected_sid then
-                    local lang = (t.lang or ""):lower()
+                if t.type == "sub" then
+                    local tier = match_tier((t.lang or ""):lower(), pref_lang)
                     -- An accessible full-dialogue track in the requested
                     -- language is more useful than a clean subtitle in an
                     -- unrelated language. Keep incomplete forced/signs-only
                     -- and commentary tracks excluded from this fallback.
-                    if matches_lang(lang, pref_lang) and track_is_usable_sdh(t) then
-                        selected_sid = apply_sub(t.id, "Preferred SDH Match (Slang)")
-                        break
+                    if tier >= 0 and tier < best_tier and track_is_usable_sdh(t) then
+                        best, best_tier = t, tier
                     end
                 end
             end
-            if selected_sid then break end
+            if best then
+                selected_sid = apply_sub(best.id, "Preferred SDH Match (Slang)")
+                break
+            end
         end
     end
 
