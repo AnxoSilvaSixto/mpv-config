@@ -550,6 +550,114 @@ try {
     Write-Log "uosc: icon-family patch failed, continuing anyway - $($_.Exception.Message)"
 }
 
+# Post-process uosc track menu (subtitles/audio/video lists): friendly language
+# names, SDH hint, underscore cleanup in titles. scripts/uosc is
+# wholesale-replaced on every uosc update, so re-apply the menus.lua patch when
+# the marker is absent. Idempotent: skips if already patched. All-or-nothing
+# write-back: a partial patch (e.g. friendly_lang call without its definition)
+# would break the menu, so any missed anchor aborts with a layout log.
+try {
+    $uoscMenusPath = Join-Path $ConfigDir 'scripts\uosc\lib\menus.lua'
+    if (Test-Path $uoscMenusPath) {
+        $menusContent = [System.IO.File]::ReadAllText($uoscMenusPath)
+        if ($menusContent -match '_uosc_lang_names_patched') {
+            # already patched, skip
+        } else {
+            Write-Log 'uosc: re-applying track-menu language-names patch'
+            # menus.lua is eol=lf (see .gitattributes); normalize so multi-line
+            # anchors match regardless of working-tree flips. This .ps1 itself
+            # is CRLF, so the here-string helper needs the same treatment.
+            $menusContent = $menusContent -replace "`r`n", "`n"
+            $T2 = "`t`t"
+            $T4 = "`t`t`t`t"
+            $T5 = "`t`t`t`t`t"
+            $menusHelper = @'
+		-- Friendly language names for track hints (_uosc_lang_names_patched).
+		-- Raw BCP47 tags (es-419, zh-Hans) are hard to scan when many tracks
+		-- share one title (e.g. a dozen "CR" rows); show a readable name and
+		-- fall back to the raw tag when unmapped.
+		local lang_names = {
+			['es'] = 'Spanish', ['es-es'] = 'Spanish (Spain)', ['es-419'] = 'Spanish (Latin America)',
+			['es-mx'] = 'Spanish (Mexico)', ['es-ar'] = 'Spanish (Argentina)', ['es-us'] = 'Spanish (US)',
+			['en'] = 'English', ['en-us'] = 'English (US)', ['en-gb'] = 'English (UK)',
+			['pt'] = 'Portuguese', ['pt-br'] = 'Portuguese (Brazil)', ['pt-pt'] = 'Portuguese (Portugal)',
+			['fr'] = 'French', ['de'] = 'German', ['it'] = 'Italian', ['ar'] = 'Arabic',
+			['ru'] = 'Russian', ['id'] = 'Indonesian', ['ms'] = 'Malay', ['vi'] = 'Vietnamese',
+			['th'] = 'Thai', ['zh-hans'] = 'Chinese (Simplified)', ['zh-hant'] = 'Chinese (Traditional)',
+			['zh'] = 'Chinese', ['pl'] = 'Polish', ['ja'] = 'Japanese', ['ko'] = 'Korean',
+			['nl'] = 'Dutch', ['ca'] = 'Catalan', ['gl'] = 'Galician', ['eu'] = 'Basque',
+			['hi'] = 'Hindi', ['tr'] = 'Turkish', ['uk'] = 'Ukrainian', ['sv'] = 'Swedish',
+			['nb'] = 'Norwegian (Bokmal)', ['no'] = 'Norwegian', ['da'] = 'Danish', ['fi'] = 'Finnish',
+			['cs'] = 'Czech', ['sk'] = 'Slovak', ['ro'] = 'Romanian', ['hu'] = 'Hungarian',
+			['el'] = 'Greek', ['he'] = 'Hebrew', ['und'] = 'Undetermined',
+		}
+		local function friendly_lang(tag)
+			if not tag or tag == '' then return tag end
+			local key = tag:lower():gsub('_', '-')
+			-- ISO 639-2 three-letter equivalents (spa~es, eng~en, jpn~ja)
+			local base = key:match('^([a-z]+)')
+			if base == 'spa' then key = 'es' .. key:sub(4)
+			elseif base == 'eng' then key = 'en' .. key:sub(4)
+			elseif base == 'jpn' then key = 'ja' .. key:sub(4)
+			end
+			return lang_names[key] or tag
+		end
+
+'@
+            $menusHelper = $menusHelper -replace "`r`n", "`n"
+            $menusOk = $true
+            # 1. helper before the track loop (anchor must hit exactly once)
+            $menusLoopOld = "${T2}for _, track in ipairs(tracklist) do"
+            if (([regex]::Matches($menusContent, [regex]::Escape($menusLoopOld))).Count -eq 1) {
+                # Here-string content ends with a single newline; add the blank
+                # separator line the checked-in file has before the loop.
+                $menusContent = $menusContent.Replace($menusLoopOld, $menusHelper + "`n" + $menusLoopOld)
+            } else {
+                Write-Log 'uosc: menus patch skipped - track-loop anchor not unique (unexpected layout)'
+                $menusOk = $false
+            }
+            # 2. friendly hint instead of raw lang tag
+            $menusHintOld = "${T4}if track.lang then h(track.lang) end"
+            if ($menusContent.Contains($menusHintOld)) {
+                $menusContent = $menusContent.Replace($menusHintOld, "${T4}if track.lang then h(friendly_lang(track.lang)) end")
+            } else {
+                Write-Log 'uosc: menus patch skipped - hint anchor not found (unexpected layout)'
+                $menusOk = $false
+            }
+            # 3. SDH hint next to forced/default
+            $menusForcedOld = "${T4}if track.forced then h(t('forced')) end"
+            if ($menusContent.Contains($menusForcedOld)) {
+                $menusContent = $menusContent.Replace($menusForcedOld, "$menusForcedOld`n${T4}if track['hearing-impaired'] then h(t('sdh')) end")
+            } else {
+                Write-Log 'uosc: menus patch skipped - forced anchor not found (unexpected layout)'
+                $menusOk = $false
+            }
+            # 4. underscore cleanup in display titles
+            $menusTitleOld = "${T4}items[#items + 1] = {`n${T5}title = (track.title and track.title or t('Track %s', track.id)),"
+            if ($menusContent.Contains($menusTitleOld)) {
+                $menusTitleNew = "${T4}-- Muxer titles use underscores as word separators (Latin_America_CR);`n${T4}-- render them with spaces. Display-only: track.title itself is untouched.`n${T4}local display_title = track.title or ''`n${T4}-- Strip Crunchyroll source tag: trailing standalone CR (" CR", "_CR",`n${T4}-- "-CR", or the whole title). Uppercase-only, separator-required, so`n${T4}-- "actor"/"micro"/"sacro" can never match.`n${T4}display_title = display_title:gsub('[%s_%-]+CR$', '')`n${T4}if display_title == 'CR' then display_title = '' end`n${T4}-- Strip muxer group tags: leading "[Erai-raws]"-style brackets.`n${T4}display_title = display_title:gsub('^%s*%[[^%]]+%]%s*', '')`n${T4}-- Muxer titles use underscores as word separators; display-only.`n${T4}display_title = display_title:gsub('_', ' '):gsub('^%s+', ''):gsub('%s+$', '')`n${T4}if display_title == '' then`n${T5}display_title = friendly_lang(track.lang) or t('Track %s', track.id)`n${T4}end`n${T4}items[#items + 1] = {`n${T5}title = display_title,""
+                $menusContent = $menusContent.Replace($menusTitleOld, $menusTitleNew)
+            } else {
+                Write-Log 'uosc: menus patch skipped - title anchor not found (unexpected layout)'
+                $menusOk = $false
+            }
+            if ($menusOk) {
+                $menusTmp = "$uoscMenusPath.$([guid]::NewGuid().ToString('N')).tmp"
+                try {
+                    [System.IO.File]::WriteAllText($menusTmp, $menusContent, (New-Object System.Text.UTF8Encoding($false)))
+                    Move-Item -Path $menusTmp -Destination $uoscMenusPath -Force
+                } finally {
+                    Remove-Item $menusTmp -Force -ErrorAction SilentlyContinue
+                }
+            } else {
+                Write-Log 'uosc: menus patch aborted - no changes written (partial patch would break the menu)'
+            }
+        }
+    }
+} catch {
+    Write-Log "uosc: menus patch failed, continuing anyway - $($_.Exception.Message)"
+}
+
 # Post-process portable launchers: the mpv build archive overwrites updater.bat
 # and mpv-register/unregister.bat on every mpv release (robocopy /E over root).
 # Re-apply our tweaks when the stock lines are found; skip when already applied.

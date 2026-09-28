@@ -246,6 +246,37 @@ function create_select_tracklist_type_menu_opener(opts)
 		table.insert(track_external_actions, {name = 'reload', icon = 'refresh', label = t('Reload') .. ' (f5)'})
 		table.insert(track_external_actions, {name = 'remove', icon = 'delete', label = t('Remove') .. ' (del)'})
 
+		-- Friendly language names for track hints (_uosc_lang_names_patched).
+		-- Raw BCP47 tags (es-419, zh-Hans) are hard to scan when many tracks
+		-- share one title (e.g. a dozen "CR" rows); show a readable name and
+		-- fall back to the raw tag when unmapped.
+		local lang_names = {
+			['es'] = 'Spanish', ['es-es'] = 'Spanish (Spain)', ['es-419'] = 'Spanish (Latin America)',
+			['es-mx'] = 'Spanish (Mexico)', ['es-ar'] = 'Spanish (Argentina)', ['es-us'] = 'Spanish (US)',
+			['en'] = 'English', ['en-us'] = 'English (US)', ['en-gb'] = 'English (UK)',
+			['pt'] = 'Portuguese', ['pt-br'] = 'Portuguese (Brazil)', ['pt-pt'] = 'Portuguese (Portugal)',
+			['fr'] = 'French', ['de'] = 'German', ['it'] = 'Italian', ['ar'] = 'Arabic',
+			['ru'] = 'Russian', ['id'] = 'Indonesian', ['ms'] = 'Malay', ['vi'] = 'Vietnamese',
+			['th'] = 'Thai', ['zh-hans'] = 'Chinese (Simplified)', ['zh-hant'] = 'Chinese (Traditional)',
+			['zh'] = 'Chinese', ['pl'] = 'Polish', ['ja'] = 'Japanese', ['ko'] = 'Korean',
+			['nl'] = 'Dutch', ['ca'] = 'Catalan', ['gl'] = 'Galician', ['eu'] = 'Basque',
+			['hi'] = 'Hindi', ['tr'] = 'Turkish', ['uk'] = 'Ukrainian', ['sv'] = 'Swedish',
+			['nb'] = 'Norwegian (Bokmal)', ['no'] = 'Norwegian', ['da'] = 'Danish', ['fi'] = 'Finnish',
+			['cs'] = 'Czech', ['sk'] = 'Slovak', ['ro'] = 'Romanian', ['hu'] = 'Hungarian',
+			['el'] = 'Greek', ['he'] = 'Hebrew', ['und'] = 'Undetermined',
+		}
+		local function friendly_lang(tag)
+			if not tag or tag == '' then return tag end
+			local key = tag:lower():gsub('_', '-')
+			-- ISO 639-2 three-letter equivalents (spa~es, eng~en, jpn~ja)
+			local base = key:match('^([a-z]+)')
+			if base == 'spa' then key = 'es' .. key:sub(4)
+			elseif base == 'eng' then key = 'en' .. key:sub(4)
+			elseif base == 'jpn' then key = 'ja' .. key:sub(4)
+			end
+			return lang_names[key] or tag
+		end
+
 		for _, track in ipairs(tracklist) do
 			if track.type == opts.type then
 				local hint_values = {}
@@ -256,7 +287,7 @@ function create_select_tracklist_type_menu_opener(opts)
 					if #value > 0 then hint_values[#hint_values + 1] = value end
 				end
 
-				if track.lang then h(track.lang) end
+				if track.lang then h(friendly_lang(track.lang)) end
 				if track['demux-h'] then
 					h(track['demux-w'] and (track['demux-w'] .. 'x' .. track['demux-h']) or (track['demux-h'] .. 'p'))
 				end
@@ -269,6 +300,7 @@ function create_select_tracklist_type_menu_opener(opts)
 				end
 				if track['demux-samplerate'] then h(string.format('%.3gkHz', track['demux-samplerate'] / 1000)) end
 				if track.forced then h(t('forced')) end
+				if track['hearing-impaired'] then h(t('sdh')) end
 				if track.default then h(t('default')) end
 				if track.external then
 					local extension = track.title:match('%.([^%.]+)$')
@@ -281,8 +313,23 @@ function create_select_tracklist_type_menu_opener(opts)
 					h(t('external'))
 				end
 
+				-- Muxer titles use underscores as word separators (Latin_America_CR);
+				-- render them with spaces. Display-only: track.title itself is untouched.
+				local display_title = track.title or ''
+				-- Strip Crunchyroll source tag: trailing standalone CR (" CR", "_CR",
+				-- "-CR", or the whole title). Uppercase-only, separator-required, so
+				-- "actor"/"micro"/"sacro" can never match.
+				display_title = display_title:gsub('[%s_%-]+CR$', '')
+				if display_title == 'CR' then display_title = '' end
+				-- Strip muxer group tags: leading "[Erai-raws]"-style brackets.
+				display_title = display_title:gsub('^%s*%[[^%]]+%]%s*', '')
+				-- Muxer titles use underscores as word separators; display-only.
+				display_title = display_title:gsub('_', ' '):gsub('^%s+', ''):gsub('%s+$', '')
+				if display_title == '' then
+					display_title = friendly_lang(track.lang) or t('Track %s', track.id)
+				end
 				items[#items + 1] = {
-					title = (track.title and track.title or t('Track %s', track.id)),
+					title = display_title,
 					hint = table.concat(hint_values, ', '),
 					value = track.id,
 					active = track_selected or snd_selected,
