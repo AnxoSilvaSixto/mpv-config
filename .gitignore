@@ -13,6 +13,10 @@ portable_config/tools/update-log.txt
 portable_config/tools/update-state.json
 portable_config/track-selector-overrides.json
 
+# Personal local scripts (user-specific, do not commit)
+portable_config/scripts/history-logger.lua
+portable_config/script-opts/history-logger.conf
+
 # OS generated
 .DS_Store
 .DS_Store?
