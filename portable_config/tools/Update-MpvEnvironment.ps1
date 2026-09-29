@@ -168,7 +168,10 @@ function Update-Mpv {
 
         # /XD portable_config: even though these builds don't currently ship one, this
         # guarantees a future build never overwrites your live config by surprise.
-        robocopy $extractDir $MpvRoot /E /XD portable_config /NFL /NDL /NJH /NJS | Out-Null
+        # /XD doc installer: upstream docs + legacy installer are droppings, never source.
+        # /XF launchers + legacy state: updater.bat and mpv-register/unregister.bat are
+        # owned locally (sole-updater dispatch); settings.xml/updater.ps1 are retired legacy.
+        robocopy $extractDir $MpvRoot /E /XD portable_config doc installer /XF updater.bat mpv-register.bat mpv-unregister.bat settings.xml updater.ps1 /NFL /NDL /NJH /NJS | Out-Null
         if ($LASTEXITCODE -ge 8) {
             throw "robocopy failed with exit code $LASTEXITCODE"
         }
@@ -658,14 +661,13 @@ try {
     Write-Log "uosc: menus patch failed, continuing anyway - $($_.Exception.Message)"
 }
 
-# Post-process portable launchers: the mpv build archive overwrites updater.bat
-# and mpv-register/unregister.bat on every mpv release (robocopy /E over root).
-# Re-apply our tweaks when the stock lines are found; skip when already applied.
-# Line-anchored (never multi-line) with EOL detection: immune to LF/CRLF flips
-# between archive versions. Idempotent per file; fail-loud per file.
+# Post-process portable launchers: robocopy now excludes updater.bat and
+# mpv-register/unregister.bat via /XF (see Update-Mpv above), so this block is
+# a safety net only — it restores the sole-updater dispatch if a stock archive
+# ever slips through. Idempotent per file; fail-loud per file.
 try {
     $launcherJobs = @(
-        @{ File = 'updater.bat'; Marker = 'updater_failed' },
+        @{ File = 'updater.bat'; Marker = 'Update-MpvEnvironment' },
         @{ File = 'mpv-register.bat'; Marker = '%~dp0mpv' },
         @{ File = 'mpv-unregister.bat'; Marker = '%~dp0mpv' }
     )
@@ -687,33 +689,43 @@ try {
         }
         $new = $null; $why = ''
         if ($job.File -eq 'updater.bat') {
-            $capAt = Find-Lines ':: After update, updater.ps1 should not in same folder as mpv.exe'
-            $gateAt = Find-Lines 'timeout 5'
-            if ($capAt.Count -ne 1 -or $gateAt.Count -ne 1 -or $gateAt[0] -le $capAt[0]) {
-                $why = 'anchors not unique/found'
-            } else {
-                $new = @()
-                for ($i = 0; $i -lt $lines.Count; $i++) {
-                    if ($i -eq $capAt[0]) {
-                        $new += ':: Capture the updater result now - later commands (del) would clobber %errorlevel%.'
-                        $new += 'set updater_failed=%errorlevel%'
-                        $new += ''
-                    }
-                    if ($i -eq $gateAt[0]) {
-                        $new += ':: Failures pause indefinitely so the error stays visible; success auto-closes.'
-                        $new += 'if %updater_failed% neq 0 ('
-                        $new += '    echo Update failed with error %updater_failed% - leaving window open.'
-                        $new += '    pause'
-                        $new += '    exit /b %updater_failed%'
-                        $new += ')'
-                        $new += ''
-                    }
-                    $new += $lines[$i]
-                }
-            }
-                if (($new -join "`n") -notmatch 'Update-MpvEnvironment') {
-                    Write-Log 'WARNING: updater.bat does not dispatch to Update-MpvEnvironment.ps1 - Option-A dispatch needs manual restore'
-                }
+            # Sole-updater dispatch: any updater.bat without our marker is stock
+            # legacy (installer/updater.ps1 branch) — replace wholesale with the
+            # preferred dispatch template. EOL follows existing file.
+            Write-Log 'updater.bat: restoring sole-updater dispatch (Update-MpvEnvironment.ps1)'
+            $new = @(
+                '@echo OFF',
+                ':: Primary entry point -> portable_config/tools/Update-MpvEnvironment.ps1 (sole updater).',
+                ':: Legacy installer/updater.ps1 is retired; ffmpeg/yt-dlp are out of scope (external tools).',
+                'pushd %~dp0',
+                'set updater_script="%~dp0portable_config\tools\Update-MpvEnvironment.ps1"',
+                '',
+                ':: Prefer pwsh (PowerShell 7+) when available, fall back to Windows PowerShell 5.1.',
+                'where pwsh >nul 2>nul',
+                'if %errorlevel% equ 0 (',
+                '    :: pwsh found, run with PowerShell 7+',
+                '    pwsh -NoProfile -NoLogo -ExecutionPolicy Bypass -File %updater_script%',
+                ') else (',
+                '    :: pwsh not found, run with Windows PowerShell 5.1',
+                '    powershell -NoProfile -NoLogo -ExecutionPolicy Bypass -File %updater_script%',
+                ')',
+                '',
+                ':: Capture the updater result now - later commands (timeout) would clobber %errorlevel%.',
+                'set updater_failed=%errorlevel%',
+                '',
+                ':: Legacy cleanup: remove stray root updater.ps1 left by old flows, if any.',
+                'if exist "%~dp0updater.ps1" (',
+                '    del "%~dp0updater.ps1"',
+                ')',
+                ':: Failures pause indefinitely so the error stays visible; success auto-closes.',
+                'if %updater_failed% neq 0 (',
+                '    echo Update failed with error %updater_failed% - leaving window open.',
+                '    pause',
+                '    exit /b %updater_failed%',
+                ')',
+                '',
+                'timeout 5'
+            )
         } else {
             $verb = 'register'; if ($job.File -match 'unregister') { $verb = 'unregister' }
             $at = Find-Lines ("`"%~dp0/mpv`" --" + $verb)
@@ -726,11 +738,13 @@ try {
                         if ($verb -eq 'register') {
                             $new += ':: --register writes registry keys tied to the CURRENT folder path - re-run this'
                             $new += ":: after moving the portable install; this is the one piece that isn't portable by design."
+                            $new += ':: Requires elevation (admin) for machine-wide file associations.'
                         } else {
                             $new += ':: --unregister removes registry keys tied to the CURRENT folder path - re-run'
                             $new += ":: mpv-register.bat after moving the portable install; this is the one piece that isn't portable by design."
+                            $new += ':: Requires elevation (admin) if registration was machine-wide.'
                         }
-                        $new += ($lines[$i] -replace '%~dp0/mpv', '%~dp0mpv')
+                        $new += ($lines[$i] -replace '%~dp0/mpv', '%~dp0mpv.exe')
                     } else {
                         $new += $lines[$i]
                     }

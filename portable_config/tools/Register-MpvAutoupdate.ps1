@@ -20,7 +20,7 @@ $Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopOnIdleEnd 
 
 Register-ScheduledTask -TaskName 'mpv-autoupdate' `
     -Action $Action -Trigger $Trigger -Settings $Settings `
-    -Description 'Daily check/update for mpv, hdr-toys, and uosc (see Update-MpvEnvironment.ps1)' `
+    -Description 'Daily check/update for mpv, hdr-toys, uosc, thumbfast, and animebuild (see Update-MpvEnvironment.ps1)' `
     -Force
 
 Write-Host "Registered. Test it immediately with:  Start-ScheduledTask -TaskName 'mpv-autoupdate'"

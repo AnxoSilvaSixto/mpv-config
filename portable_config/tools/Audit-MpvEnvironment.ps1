@@ -97,10 +97,28 @@ $settingsPath = Join-Path $Root 'settings.xml'
 if (Test-Path $settingsPath) {
     try {
         [void][xml](Get-Content $settingsPath -Raw)
-        Pass 'settings.xml parses (legacy, present)'
+        Warn 'settings.xml present (legacy retired; expected absent — remove to complete migration)'
     } catch { Fail "settings.xml XML parse failed: $($_.Exception.Message)" }
 } else {
     Pass 'settings.xml absent (legacy removed, expected)'
+}
+
+# Launchers: sole-updater dispatch + deterministic register target
+try {
+    $updaterBat = Get-Content (Join-Path $Root 'updater.bat') -Raw
+    if ($updaterBat -match 'Update-MpvEnvironment') { Pass 'updater.bat dispatches to Update-MpvEnvironment.ps1' }
+    else { Fail 'updater.bat does not dispatch to Update-MpvEnvironment.ps1 (legacy)' }
+    if ($updaterBat -match 'installer\\updater\.ps1') { Fail 'updater.bat still references legacy installer/updater.ps1' }
+    else { Pass 'updater.bat has no legacy installer reference' }
+} catch { Fail "updater.bat check failed: $($_.Exception.Message)" }
+foreach ($rb in @('mpv-register.bat','mpv-unregister.bat')) {
+    try {
+        $raw = Get-Content (Join-Path $Root $rb) -Raw
+        if ($raw -match '%~dp0mpv\.exe') { Pass "$rb uses deterministic %~dp0mpv.exe target" }
+        elseif ($raw -match '%~dp0mpv') { Warn "$rb uses extensionless %~dp0mpv (prefer %~dp0mpv.exe)" }
+        else { Fail "$rb missing %~dp0mpv target" }
+        if ($raw -match '%~dp0/mpv') { Fail "$rb still uses mixed-separator %~dp0/mpv" }
+    } catch { Fail "$rb check failed: $($_.Exception.Message)" }
 }
 
 # hdr-toggle.lua: must exist and expose hdr-toys filtering via script-binding

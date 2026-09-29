@@ -15,14 +15,33 @@ jobs:
         shell: pwsh
         run: |
           Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-          & "$PWD/portable_config/tools/Audit-MpvEnvironment.ps1"
+          & "$PWD/portable_config/tools/Audit-MpvEnvironment.ps1" -FailOnLfsPointer
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Upload mpv log on failure
+      - name: Verify sole-updater dispatch
+        shell: pwsh
+        run: |
+          $t = Get-Content "$PWD/updater.bat" -Raw
+          if ($t -notmatch 'Update-MpvEnvironment') { Write-Host 'FAIL: updater.bat does not dispatch to Update-MpvEnvironment.ps1'; exit 1 }
+          if ($t -match 'installer\\updater\.ps1') { Write-Host 'FAIL: updater.bat still references legacy installer/updater.ps1'; exit 1 }
+          Write-Host 'PASS: updater.bat dispatches to Update-MpvEnvironment.ps1'
+      - name: Verify working tree clean
+        shell: pwsh
+        run: |
+          $dirty = git status --porcelain=v1 | Where-Object { $_ -match '^ M' }
+          if ($dirty) { Write-Host "FAIL: tracked files modified:`n$($dirty -join \"`n\")"; exit 1 }
+          Write-Host 'PASS: working tree clean'
+      - name: Idle smoke (mpv startup log)
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'mpv-smoke.log'
+          & "$PWD/mpv.com" --config-dir="$PWD/portable_config" --idle=once --force-window=no --no-terminal --log-file="$log"
+          if (Select-String -Path $log -Pattern '\[e\]|\[fatal\]|lua error' -Quiet) { Get-Content $log -Tail 60; exit 1 }
+          Write-Host 'PASS: idle smoke log clean'
+      - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: mpv-audit-log
           path: |
-            portable_config/tools/update-log.txt
-            ${{ runner.temp }}/mpv-test.log
+            ${{ runner.temp }}/mpv-smoke.log
           if-no-files-found: ignore

@@ -29,12 +29,12 @@ C:\mpv\
 │   │   ├── uosc.conf             # NieR:Automata palette, floating bar
 │   │   ├── thumbfast.conf        # 400×400, mobius, hwdec=yes
 │   │   ├── changerefresh.conf    # rates include 165 (native), auto=yes
-│   │   ├── sub_select.conf / sub-select.json  # Spanish-first fallback
+│   │   ├── sub_select.conf / sub-select.json  # reserved for disabled sub-select (track-selector is active)
 │   │   └── ...
 │   ├── shaders/
-│   │   ├── hdr-toys/             # 77 files, ~300 KB plain text (NOT LFS)
+│   │   ├── hdr-toys/             # 80 files, ~349 KB plain text (NOT LFS)
 │   │   ├── SSimSuperRes.glsl / SSimDownscaler.glsl  # plain text, 5-6 KB (NOT LFS)
-│   │   ├── ArtCNN_C4F32.glsl / CfL_Prediction.glsl / nlmeans.glsl / ravu-zoom-ar-r4.hook  # Git LFS
+│   │   ├── ArtCNN_C4F32.glsl / ArtCNN_C4F16.glsl / CfL_Prediction.glsl / nlmeans.glsl / ravu-zoom-ar-r4.hook  # Git LFS (5 files)
 │   │   └── ...
 │   ├── fonts/                    # uosc_icons.ttf + uosc_textures.ttf (ttf only)
 │   │                                # .otf removed (Apr 2024) — keep ttf only, never re-add .otf
@@ -49,7 +49,7 @@ C:\mpv\
 └── README.md / AGENTS.md / .gitignore / .gitattributes
 ```
 
-**Critical:** No `C:\mpv\shaders\` at root. Keep portable `~~/` paths in mpv.conf/input.conf/shader appends (only cache dirs are known-safe for `~~/`; hdr-toys paths stay `~~/` after updater).
+**Critical:** No `C:\mpv\shaders\` at root. Keep portable `~~/` paths in mpv.conf/input.conf/shader appends (cache dirs, includes, and hdr-toys paths all stay `~~/` after updater). `screenshot-directory` intentionally uses `~/Pictures/mpv` (user Pictures, not portable).
 
 ---
 
@@ -65,8 +65,8 @@ C:\mpv\
 
 ## 3. Git LFS
 
-- **LFS (4 files):** `ArtCNN_C4F32.glsl`, `CfL_Prediction.glsl`, `nlmeans.glsl`, `ravu-zoom-ar-r4.hook` — `.gitattributes` tracks `ArtCNN*`/`CfL*`/`nlmeans*`/`ravu*.hook`.
-- **Plain text:** `SSimSuperRes.glsl` / `SSimDownscaler.glsl` (5-6 KB) and entire `hdr-toys/` (~300 KB) stay plain text — never add to LFS.
+- **LFS (5 files):** `ArtCNN_C4F32.glsl`, `ArtCNN_C4F16.glsl`, `CfL_Prediction.glsl`, `nlmeans.glsl`, `ravu-zoom-ar-r4.hook` — `.gitattributes` tracks `ArtCNN*`/`CfL*`/`nlmeans*`/`ravu*.hook`.
+- **Plain text:** `SSimSuperRes.glsl` / `SSimDownscaler.glsl` (5-6 KB) and entire `hdr-toys/` (80 files, ~349 KB) stay plain text — never add to LFS.
 - Without `git lfs pull`, LFS files read as `version https://git-lfs.github.com/spec/v1` pointer text. Run `git lfs install && git lfs pull` after clone. Never `git add` a pointer.
 
 ---
@@ -88,11 +88,11 @@ C:\mpv\
 
 ## 5. Key Config Notes
 
-- **mpv.conf:** `vo=gpu-next` + `gpu-api=vulkan`, `hwdec=auto-safe`, `profile=high-quality`, `target` colorspace via profiles. All `Res-*` profiles use `profile-restore=copy` and nil-guarded `height` conditions; `include` for `hdr-toys.conf` must stay before any profile. Res profiles: SD (<700) → ravu/CfL/SSim, 720p 2× (700–739) → ArtCNN/CfL/SSim, fractional (740–1339) → ravu/CfL/SSim, near-native (1340–1439) → CfL/SSim, downscale (≥1440) → CfL/SSim + ewa_lanczos. Colorspace: BT.709/NTSC/PAL/gray + `[ending]` with `get("duration",0)>0` guard to avoid idle save; `[ending]` and auto-save-state.lua co-own save-position-on-quit (script freezes entry writes in the last 60s, profile forces no — verified by test-session).
+- **mpv.conf:** `vo=gpu-next` + `gpu-api=vulkan`, `hwdec=auto-safe`, `profile=high-quality`, `target` colorspace via profiles. All `Res-*` profiles use `profile-restore=copy` and nil-guarded `height` conditions; `include` for `hdr-toys.conf` must stay before any profile. Res profiles: SD (<700) → ArtCNN_C4F16/CfL/SSim, 720p 2× (700–739) → ArtCNN_C4F32/CfL/SSim, fractional (740–1339) → ravu/CfL/SSim, near-native (1340–1439) → CfL/SSim, downscale (≥1440) → CfL/SSim + ewa_lanczos. Buckets are contiguous (no gaps). Cond idioms vary by file (bare `height` in res, `p[...]` in colorspace, `get(...)` in hdr-toys/[ending]) — all valid on mpv 0.41, do not unify without a full profile-matrix test. `[linear]` (exr/hdr/tiff_pipe) intentionally stacks `vf/scale/deband=no` over Res-*; `[ending]` and auto-save-state.lua co-own save-position-on-quit (script freezes entry writes in the last 60s, profile forces no — verified by test-session). `reset-on-next-file` includes `hue` (valid `--hue` property reset).
 - **HDR is local choice, not proof:** Windows/monitor path may still be SDR — test real HDR content separately. `hdr-toys` tone-mapping is optional tuning, `Alt+h` restores native.
-- **input.conf:** Preserve `MBTN_RIGHT` + `MENU` → `uosc/menu` or right-click menu breaks. `#!` comments define menu paths. `Alt+h` is now `script-binding hdr-toggle` (filters any `hdr-toys` shader, reload file to restore). `Alt+d` toggles deband, `Alt+n`/`Alt+Shift+n` prepend/remove `nlmeans.glsl` (denoise before upscale).
+- **input.conf:** Preserve `MBTN_RIGHT` + `MENU` → `uosc/menu` or right-click menu breaks. `#!` comments define menu paths. `Alt+h` is `script-binding hdr-toggle` (filters any `hdr-toys` shader, reload file to restore; both input.conf and hdr-toggle.lua bind Alt+h to the same action — intentional). `z/Z` are bound both in input.conf and betterchapters.lua to the same playlist-aware chapter action — intentional duplicate, same target. `Alt+d` toggles deband, `Alt+n`/`Alt+Shift+n` prepend/remove `nlmeans.glsl` (denoise before upscale).
 - **script-opts:** `uosc.conf` — **NieR:Automata palette** (`foreground=e8dcc7/background=3a3528/curtain=c8c2aa/success=6a9f3e/error=c44536/match=c9944b`, `opacity 0.85`, `scale 1.2/1.56`, `timeline_size 40`, `chapter_ranges` with multilingual patterns, `autoload=no`, `languages=en` (UI pinned English; mpv.conf slang track prefs untouched), icon family `Material Symbols Rounded` (must match fonts/uosc_icons.ttf or ligatures render as raw text)). `thumbfast.conf` — `max 400×400`, `tone_mapping=mobius` (not `auto`), `hwdec=yes`, `overlay_id=42`. `changerefresh.conf` — `rates` must keep `165` (plus `144` for 24fps×6), `auto=yes`, `original_width/height/rate` for revert; findValidRate prefers even multiples (24→144, 25→50, 29.97→60) over closest-match.
-- **shaders/scripts:** Never hand-edit `hdr-toys/`; SSim shaders use LFS-free plain text. uosc/thumbfast are vendored via updater — local patches only for `display/change-refresh.lua` (Set-RefreshRate integration; helper resolves from its own dir, CWD-independent). track-selector.lua ignores aid/sid changes with no active playback (EOF-teardown guard); auto-save-state.lua freezes saves in `[ending]`'s last 60s.
+- **shaders/scripts:** Never hand-edit `hdr-toys/`; SSim shaders use LFS-free plain text. uosc/thumbfast are vendored via updater — local patches only for `display/change-refresh.lua` (Set-RefreshRate integration; helper resolves from its own dir, CWD-independent). track-selector.lua ignores aid/sid changes with no active playback (EOF-teardown guard); auto-save-state.lua freezes saves in `[ending]`'s last 60s. `track-selector.lua` optionally reads `~~/script-opts/anime-mode.conf` (absent = defaults, graceful); `sub-select.lua` + opts are retained but DISABLED (track-selector is active).
 
 ---
 
@@ -146,4 +146,4 @@ git add portable_config/mpv.conf portable_config/input.conf   # stage only inten
 git lfs install; git lfs pull; git lfs ls-files               # for shaders
 ```
 
-Last updated: 2026-09-09 — slimmed to ~180 lines; synced with mpv.conf 160, input.conf 67, hdr-toys auto-managed, fonts ttf-only, hdr-toggle.lua, SSim plain-text, LFS = ArtCNN/CfL/nlmeans/ravu.
+Last updated: 2026-09-29 — sole-updater dispatch (updater.bat → Update-MpvEnvironment.ps1), legacy installer/settings retired, robocopy /XF launchers, docs synced (hdr-toys 80 files, LFS 5, Res-SD ArtCNN_C4F16).

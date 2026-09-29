@@ -1,28 +1,25 @@
 @echo OFF
-:: This batch file exists to run updater.ps1 without hassle
+:: Primary entry point -> portable_config/tools/Update-MpvEnvironment.ps1 (sole updater).
+:: Legacy installer/updater.ps1 is retired; ffmpeg/yt-dlp are out of scope (external tools).
 pushd %~dp0
-if exist "%~dp0\installer\updater.ps1" (
-    set updater_script="%~dp0\installer\updater.ps1"
-) else (
-    set updater_script="%~dp0\updater.ps1"
-)
+set updater_script="%~dp0portable_config\tools\Update-MpvEnvironment.ps1"
 
-:: Check if pwsh is in the system's PATH
+:: Prefer pwsh (PowerShell 7+) when available, fall back to Windows PowerShell 5.1.
 where pwsh >nul 2>nul
 if %errorlevel% equ 0 (
-    :: pwsh is in PATH, so run the script using Windows Powershell
+    :: pwsh found, run with PowerShell 7+
     pwsh -NoProfile -NoLogo -ExecutionPolicy Bypass -File %updater_script%
 ) else (
-    :: pwsh is not in PATH, run the script using PowerShell Core
+    :: pwsh not found, run with Windows PowerShell 5.1
     powershell -NoProfile -NoLogo -ExecutionPolicy Bypass -File %updater_script%
 )
 
-:: Capture the updater result now - later commands (del) would clobber %errorlevel%.
+:: Capture the updater result now - later commands (timeout) would clobber %errorlevel%.
 set updater_failed=%errorlevel%
 
-:: After update, updater.ps1 should not in same folder as mpv.exe
-if exist "%~dp0\installer\updater.ps1" if exist "%~dp0\updater.ps1" (
-    del "%~dp0\updater.ps1"
+:: Legacy cleanup: remove stray root updater.ps1 left by old flows, if any.
+if exist "%~dp0updater.ps1" (
+    del "%~dp0updater.ps1"
 )
 :: Failures pause indefinitely so the error stays visible; success auto-closes.
 if %updater_failed% neq 0 (

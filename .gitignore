@@ -13,10 +13,6 @@ portable_config/tools/update-log.txt
 portable_config/tools/update-state.json
 portable_config/track-selector-overrides.json
 
-# Personal local scripts (user-specific, do not commit)
-portable_config/scripts/history-logger.lua
-portable_config/script-opts/history-logger.conf
-
 # OS generated
 .DS_Store
 .DS_Store?
@@ -33,5 +29,9 @@ tests/*.log
 
 # mpv build droppings re-deposited by Update-MpvEnvironment's mpv-extract step
 # (robocopy /E over root): stale upstream docs + legacy installer, not source.
+# robocopy now excludes these via /XD doc installer + /XF launchers, this is a safety net.
 doc/
 installer/
+# Retired legacy updater state (preferred updater uses tools/update-state.json instead)
+settings.xml
+updater.ps1
