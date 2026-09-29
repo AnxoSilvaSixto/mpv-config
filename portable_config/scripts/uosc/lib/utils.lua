@@ -618,7 +618,16 @@ end
 
 ---@param delta number
 function navigate_item(delta)
-	if state.has_playlist then return navigate_playlist(delta) else return navigate_directory(delta) end
+    -- Try chapter seek first; fall through to playlist/directory when no
+    -- more chapters exist in that direction.
+    local chapters = mp.get_property_number('chapters') or 0
+    local chapter  = mp.get_property_number('chapter') or 0
+    local target   = chapter + delta
+    if target >= 0 and target < chapters then
+        mp.commandv('add', 'chapter', delta)
+        return true
+    end
+    if state.has_playlist then return navigate_playlist(delta) else return navigate_directory(delta) end
 end
 
 -- Can't use `os.remove()` as it fails on paths with unicode characters.

@@ -91,7 +91,7 @@ end
 local function draw_button(label, remaining, is_hovering)
     local cx, cy = 1650, 980
     local ass = "{\\an5}{\\pos(" .. cx .. "," .. cy .. ")}"
-    ass = ass .. "{\\fnSource Sans Pro}{\\fs40}{\\b1}"
+    ass = ass .. "{\\fnSource Sans Pro}{\\fs36}{\\b1}"
     ass = ass .. "{\\bord4}{\\shad2}{\\blur4}{\\3c&H000000&}{\\4c&H000000&}"
     
     if is_hovering then
