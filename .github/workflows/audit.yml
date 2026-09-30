@@ -28,11 +28,12 @@ jobs:
         shell: pwsh
         run: |
           $dirty = git status --porcelain=v1 | Where-Object { $_ -match '^ M' }
-          if ($dirty) { Write-Host "FAIL: tracked files modified:`n$($dirty -join \"`n\")"; exit 1 }
+          if ($dirty) { Write-Host 'FAIL: tracked files modified:'; $dirty | ForEach-Object { Write-Host $_ }; exit 1 }
           Write-Host 'PASS: working tree clean'
       - name: Idle smoke (mpv startup log)
         shell: pwsh
         run: |
+          if (-not (Test-Path "$PWD/mpv.com")) { Write-Host 'SKIP: mpv.com not in repo (binary is git-ignored)'; exit 0 }
           $log = Join-Path $env:RUNNER_TEMP 'mpv-smoke.log'
           & "$PWD/mpv.com" --config-dir="$PWD/portable_config" --idle=once --force-window=no --no-terminal --log-file="$log"
           if (Select-String -Path $log -Pattern '\[e\]|\[fatal\]|lua error' -Quiet) { Get-Content $log -Tail 60; exit 1 }
