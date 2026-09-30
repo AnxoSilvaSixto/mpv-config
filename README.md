@@ -28,7 +28,8 @@ C:\mpv\
 │   ├── script-opts/                   # uosc, thumbfast, refresh, subtitle options
 │   ├── shaders/
 │   │   ├── hdr-toys/                  # 80 files plain text (~349 KB)
-│   │   ├── ArtCNN_C4F32.glsl / ArtCNN_C4F16.glsl / CfL_Prediction.glsl / nlmeans.glsl / ravu-zoom-ar-r4.hook  # Git LFS
+│   │   ├── ArtCNN_C4F32.glsl / ArtCNN_C4F16.glsl / ArtCNN_*_DN.glsl / CfL_Prediction.glsl / nlmeans.glsl / ravu-zoom-ar-r4.hook  # Git LFS (7 files)
+│   │   ├── KrigBilateral.glsl / FSRCNNX_x2_16-0-4-1.glsl / hdeband.glsl / noise_static_luma.hook  # vetted A/B alternatives, plain text
 │   │   └── SSimSuperRes.glsl / SSimDownscaler.glsl  # plain text (not LFS)
 │   ├── fonts/                         # uosc_icons.ttf + uosc_textures.ttf (ttf-only)
 │   └── tools/
@@ -46,7 +47,7 @@ C:\mpv\
 ## What is enabled
 
 - `vo=gpu-next`, Vulkan, `hwdec=auto-safe`, and the high-quality profile.
-- Resolution profiles (`profiles/res.conf`) select ArtCNN_C4F16 (SD), ArtCNN_C4F32 (720p exact 2x), ravu (fractional), CfL + direction-split SSim anti-ringing; faithful scalers pinned (`scale/cscale=spline36`, `dscale=hermite/mitchell`, full antiring); dither=fruit, fbo-format=rgba16hf. Five large shaders use Git LFS (ArtCNN C4F32 for 720p, ArtCNN C4F16 for SD, CfL, nlmeans, ravu); `SSimSuperRes/Downscaler` are plain text (not LFS), `hdr-toys/` (80 files) remains ordinary text.
+- Resolution profiles (`profiles/res.conf`) select ArtCNN_C4F16 (SD), ArtCNN_C4F32 (720p exact 2x), ravu (fractional), CfL + direction-split SSim anti-ringing; faithful scalers pinned (`scale=spline36`, `cscale=ewa_lanczossharp`, `dscale=hermite/mitchell`, full antiring); dither=fruit, fbo-format=rgba16hf. Seven large shaders use Git LFS (ArtCNN C4F32/C4F16/DN pair, CfL, nlmeans, ravu); `SSimSuperRes/Downscaler`, KrigBilateral, FSRCNNX, hdeband, static-grain noise are plain text (not LFS), `hdr-toys/` (80 files) remains ordinary text.
 - Dual quality tracks: faithful defaults + opt-in `[MaxQuality]` (`Alt+q`, profiles/maxquality.conf — ewa_lanczossharp + stronger deband) for A/B judgment.
 - `uosc` provides the UI and menus. `thumbfast.lua` is loaded as the standalone top-level `thumbfast` script, which is required for uosc thumbnail messages to reach it.
 - `change-refresh.lua` can match display refresh rates. The configured list includes 165 Hz so it can restore the native desktop mode.

@@ -328,6 +328,12 @@ Update-GitFolder -Repo $AnimeBuildRepo -StateKey 'animebuild' -RepoBranch $Anime
     @{ Source = 'shaders\SSimDownscaler.glsl'; Dest = 'shaders\SSimDownscaler.glsl'; IsDir = $false }
 )
 
+# Manually-managed shaders (never synced, never deleted by this script):
+# KrigBilateral.glsl, FSRCNNX_x2_16-0-4-1.glsl, ArtCNN_*_DN.glsl, hdeband.glsl,
+# noise_static_luma.hook — vetted A/B alternatives, see AGENTS.md verdicts.
+# Sources: igv gist/releases, Artoriuz/ArtCNN GLSL, AN3223/dotfiles,
+# iwalton3/default-shader-pack. To update one: download, verify //!HOOK, A/B.
+#
 # auto-save-state.lua is OWNED LOCALLY (frozen 2026-09-11): no longer synced, so
 # upstream rewrites can never clobber the ending-window awareness ([ending] owns
 # last 60s). Upstream source, for manual monitoring only:

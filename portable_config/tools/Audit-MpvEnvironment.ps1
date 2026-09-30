@@ -207,6 +207,7 @@ if (-not (Test-Path $workflowPath)) {
 # Detect, but do not modify, LFS pointer files. Refined expectations:
 # - ArtCNN/CfL/nlmeans/ravu are LFS (allowed pointers when not yet pulled)
 # - SSim*.glsl are plain text (never LFS) - 5-6 KB each
+# - KrigBilateral/FSRCNNX/hdeband/noise_static are plain text (never LFS)
 # - hdr-toys/ is plain text (never LFS) - ~300 KB total
 $gitattributesPath = Join-Path $Root '.gitattributes'
 if (Test-Path $gitattributesPath) {
@@ -223,7 +224,7 @@ if (Test-Path $gitattributesPath) {
 } else { Fail 'missing path: .gitattributes' }
 
 # Top-level shader LFS pointer refinement
-$allowedLfsNames = @('ArtCNN_C4F32.glsl', 'CfL_Prediction.glsl', 'nlmeans.glsl', 'ravu-zoom-ar-r4.hook')
+$allowedLfsNames = @('ArtCNN_C4F32.glsl', 'ArtCNN_C4F16.glsl', 'ArtCNN_C4F16_DN.glsl', 'ArtCNN_C4F32_DN.glsl', 'CfL_Prediction.glsl', 'nlmeans.glsl', 'ravu-zoom-ar-r4.hook')
 $lfsPointers = @()
 $ssimPointerNames = @()
 Get-ChildItem (Join-Path $Root 'portable_config/shaders') -File -ErrorAction SilentlyContinue | ForEach-Object {
