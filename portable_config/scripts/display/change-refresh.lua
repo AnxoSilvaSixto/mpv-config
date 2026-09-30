@@ -255,7 +255,7 @@ function changeRefresh(width, height, rate, display)
     --ChangeDisplaySettingsEx for a change that does nothing.
     if  tostring(var.current_height) == height and
         tostring(var.current_width) == width and
-        tostring(math.floor(mp.get_property_number('display-fps'))) == rate
+        tostring(math.floor(mp.get_property_number('display-fps', 0))) == rate
     then
         msg.verbose('display already at target mode (' .. width .. 'x' .. height .. ' ' .. rate .. 'Hz), skipping')
         var.current_width, var.current_height = 0, 0
@@ -300,6 +300,8 @@ function changeRefresh(width, height, rate, display)
         else
             msg.error('Set-RefreshRate.ps1 output: ' .. (process.stderr or process.stdout or '(none)'))
         end
+        var.current_width, var.current_height = 0, 0
+        return
     end
 
     osdMessage("changing display " .. var.dnumber .. " to " .. width .. "x" .. height .. " " .. rate .. "Hz")
@@ -321,6 +323,11 @@ function getDisplayResolution()
     while time + 0.1 > mp.get_time() do end
 
     local width, height = mp.get_osd_size()
+    if type(width) ~= "number" or type(height) ~= "number" then
+        msg.warn("getDisplayResolution: no OSD size (vo=null?) - skipping")
+        mp.set_property_bool("fullscreen", isFullscreen)
+        return nil, nil
+    end
 
     msg.verbose('current monitor resolution = ' .. width .. 'x' .. height)
 
@@ -486,7 +493,7 @@ function matchVideo()
         msg.verbose('saving original resolution: ' .. var.current_width .. 'x' .. var.current_height)
         var.original_width, var.original_height = var.current_width, var.current_height
 
-        var.original_fps = math.floor(mp.get_property_number('display-fps'))
+        var.original_fps = math.floor(mp.get_property_number('display-fps', 0))
         msg.verbose('saving original fps: ' .. var.original_fps)
     end
 
@@ -520,7 +527,9 @@ end
 --sets the current resolution and refresh as the default to use upon reversion
 function setDefault()
     var.original_width, var.original_height = getDisplayResolution()
-    var.original_fps = math.floor(mp.get_property_number('display-fps'))
+    if var.original_width == nil then var.original_width = options.original_width end
+    if var.original_height == nil then var.original_height = options.original_height end
+    var.original_fps = math.floor(mp.get_property_number('display-fps', 0))
 
     var.beenReverted = true
 

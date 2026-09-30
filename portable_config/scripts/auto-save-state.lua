@@ -22,7 +22,7 @@ end
 if not in_ending_window() then mp.set_property("save-position-on-quit", "yes") end
 
 local loaded_file_path
-local idle
+local idle = false
 local eof_reached
 
 local function save()
@@ -49,7 +49,9 @@ end
 
 mp.register_event("file-loaded", function()
     loaded_file_path = mp.get_property("path")
-    timer.timeout = options.auto_save_interval
+    local interval = tonumber(options.auto_save_interval) or 1
+    if interval <= 0 then interval = 1 end
+    timer.timeout = interval
     timer_state(true)
     save()
 end)
@@ -70,7 +72,9 @@ mp.observe_property("eof-reached", "bool", function(name, eof)
         eof_reached = true
         if options.delete_finished then
             print("Deleting state (eof-reached).")
-            mp.commandv("delete-watch-later-config", loaded_file_path)
+            if loaded_file_path then
+                mp.commandv("delete-watch-later-config", loaded_file_path)
+            end
             mp.set_property("save-position-on-quit", "no")
         else
             save()
@@ -93,17 +97,18 @@ mp.register_event("end-file", function(event)
     if options.delete_unloaded then
         if event["reason"] == "eof" or event["reason"] == "stop" then
             print("Deleting state (end-file " .. event["reason"] .. ").")
-            mp.commandv("delete-watch-later-config", loaded_file_path)
+            if loaded_file_path then
+                mp.commandv("delete-watch-later-config", loaded_file_path)
+            end
         end
     end
 end)
 
-mp.observe_property("idle-active", "bool", function(name, idle)
+mp.observe_property("idle-active", "bool", function(name, is_idle)
+    idle = is_idle and true or false
     if idle then
-        idle = true
         timer_state(false)
     else
-        idle = false
         timer_state(true)
     end
 end)

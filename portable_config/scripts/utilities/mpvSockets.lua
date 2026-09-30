@@ -1,6 +1,9 @@
 -- Source: Chinna95P/mpv-anime-build (scripts/mpvSockets.lua)
 -- mpvSockets: provide one discoverable IPC endpoint per mpv instance without
 -- replacing an endpoint supplied by an external controller such as MediaFlick.
+-- NOTE: this is the MAIN-instance endpoint. The thumbfast worker subprocess
+-- uses its own separate --input-ipc-server (see thumbfast.lua socket option).
+-- Do not confuse the two when editing IPC settings.
 
 local mp = require "mp"
 local utils = require "mp.utils"

@@ -1,5 +1,8 @@
 -- =================================================================================
 -- MPV-PC: "UP NEXT" INTERACTIVE (v3.0 — uosc Visual Identity)
+-- Owned locally (no upstream sync): palette mirrors script-opts/uosc.conf NieR
+-- tokens; geometry is fixed 1920x1080 ASS coords; poll 10Hz early-outs when
+-- playlist-count==1. Re-check by hand occasionally (no updater coverage).
 -- =================================================================================
 
 local mp = require 'mp'

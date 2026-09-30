@@ -179,6 +179,10 @@ local function detect_end()
     if meta.w and meta.h and meta.x and meta.y then
         local width = mp.get_property_native("width")
         local height = mp.get_property_native("height")
+        if type(width) ~= "number" or type(height) ~= "number" then
+            mp.msg.warn("autocrop: no video dimensions (audio-only/idle?) - skipping")
+            return
+        end
 
         meta = {
             w = tonumber(meta.w),
@@ -193,6 +197,7 @@ local function detect_end()
     else
         mp.msg.error("Got empty crop data.")
         mp.msg.info("You might need to increase detect_seconds.")
+        return
     end
 
     apply_crop(meta)

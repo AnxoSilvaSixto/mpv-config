@@ -26,7 +26,7 @@ local function disable_hdr_toys()
 
     local filtered = {}
     for _, s in ipairs(shaders) do
-        if not s:find('hdr-toys', 1, true) then
+        if type(s) ~= "string" or not s:find('hdr-toys', 1, true) then
             filtered[#filtered + 1] = s
         end
     end
@@ -43,11 +43,15 @@ local function disable_hdr_toys()
         msg.verbose('hdr-toggle: removed ' .. (#shaders - #filtered) .. ' hdr-toys shader(s)')
     end
 
-    mp.set_property('target-colorspace-hint', 'yes')
-    mp.set_property('tone-mapping', 'spline')
-    mp.set_property('gamut-mapping-mode', 'auto')
-    mp.set_property('target-prim', 'bt.709')
-    mp.set_property('target-trc', 'bt.1886')
+    local function try_set(prop, value)
+        local ok, err = pcall(mp.set_property, prop, value)
+        if not ok then msg.warn('hdr-toggle: failed to set ' .. prop .. ': ' .. tostring(err)) end
+    end
+    try_set('target-colorspace-hint', 'yes')
+    try_set('tone-mapping', 'spline')
+    try_set('gamut-mapping-mode', 'auto')
+    try_set('target-prim', 'bt.709')
+    try_set('target-trc', 'bt.1886')
 
     mp.osd_message('hdr-toys OFF -- native tone-mapping restored (reload file to bring hdr-toys back)')
 end

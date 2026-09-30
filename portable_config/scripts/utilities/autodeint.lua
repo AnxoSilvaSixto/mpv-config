@@ -71,12 +71,16 @@ local function stop_detect()
 end
 
 local function judge(label)
-    -- get the metadata
+    -- get the metadata (nil-safe: idet may have failed to insert or produced no data)
     local result = mp.get_property_native(string.format("vf-metadata/%s", label))
-    local num_tff          = tonumber(result["lavfi.idet.multiple.tff"])
-    local num_bff          = tonumber(result["lavfi.idet.multiple.bff"])
-    local num_progressive  = tonumber(result["lavfi.idet.multiple.progressive"])
-    local num_undetermined = tonumber(result["lavfi.idet.multiple.undetermined"])
+    if type(result) ~= "table" then
+        mp.msg.warn(label .. ": no idet metadata (filter missing?) - treating as progressive")
+        return progressive
+    end
+    local num_tff          = tonumber(result["lavfi.idet.multiple.tff"]) or 0
+    local num_bff          = tonumber(result["lavfi.idet.multiple.bff"]) or 0
+    local num_progressive  = tonumber(result["lavfi.idet.multiple.progressive"]) or 0
+    local num_undetermined = tonumber(result["lavfi.idet.multiple.undetermined"]) or 0
     local num_interlaced   = num_tff + num_bff
     local num_determined   = num_interlaced + num_progressive
 

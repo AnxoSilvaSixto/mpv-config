@@ -71,8 +71,11 @@ else { Fail 'updater destination is not scripts/thumbfast.lua' }
 $mpvConfPath = Join-Path $Root 'portable_config/mpv.conf'
 $mpvConf = Get-Content $mpvConfPath -Raw
 if ($mpvConf -match 'include="~~/profiles/res\.conf"' -and $mpvConf -match 'include="~~/profiles/colorspace\.conf"') { Pass 'mpv.conf includes profiles/res.conf and profiles/colorspace.conf' } else { Fail 'mpv.conf missing include="~~/profiles/res.conf" or include="~~/profiles/colorspace.conf"' }
+if ($mpvConf -match 'include="~~/profiles/maxquality\.conf"') { Pass 'mpv.conf includes profiles/maxquality.conf' } else { Fail 'mpv.conf missing include="~~/profiles/maxquality.conf"' }
 Check-Path 'portable_config/profiles/res.conf'
 Check-Path 'portable_config/profiles/colorspace.conf'
+Check-Path 'portable_config/profiles/maxquality.conf'
+Check-Path 'portable_config/script-opts/anime-mode.conf'
 # Aggregate profile content for guards (mpv.conf + includes if present)
 $profileSearchText = $mpvConf
 foreach ($p in @('portable_config/profiles/res.conf','portable_config/profiles/colorspace.conf')) { $pp = Join-Path $Root $p; if (Test-Path $pp) { $profileSearchText += "`n" + (Get-Content $pp -Raw) } }
