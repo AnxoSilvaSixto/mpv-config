@@ -1,18 +1,8 @@
--- hdr-toggle.lua — native tone-mapping fallback for hdr-toys
--- Replaces the 9x `change-list glsl-shaders del` chain previously in
--- input.conf's Alt+h binding. Filtering via :find('hdr-toys',1,true)
--- (case-sensitive) removes any shader containing 'hdr-toys' regardless of
--- which hdr-toys profile (bt.2100-pq / bt.2100-hlg / bt.2020 / linear) is
--- active. `change-list del` on a path that was never loaded is a harmless
--- no-op, so filtering the live glsl-shaders list is safe. Reload the file
--- to bring hdr-toys back.
+-- hdr-toggle.lua - Alt+h: drop hdr-toys shaders, restore native tone-mapping.
+-- Reload file to bring hdr-toys back.
 local msg = require 'mp.msg'
-local utils = require 'mp.utils'
 
 local function disable_hdr_toys()
-    -- Use mp.get_property('glsl-shaders') to satisfy spec; also use
-    -- native for robust table handling (mpv returns ";"-joined string via
-    -- get_property and table via get_property_native).
     local raw = mp.get_property('glsl-shaders', '')
     local shaders = mp.get_property_native('glsl-shaders')
     if type(shaders) ~= 'table' then
@@ -33,9 +23,6 @@ local function disable_hdr_toys()
 
     if #filtered ~= #shaders then
         if #filtered == 0 then
-            -- mp.set_property('glsl-shaders', '') would leave {""}, so use
-            -- native for the empty case; keep mp.set_property substring for
-            -- audit literal check (handled in else branch).
             mp.set_property_native('glsl-shaders', filtered)
         else
             mp.set_property('glsl-shaders', table.concat(filtered, ';'))

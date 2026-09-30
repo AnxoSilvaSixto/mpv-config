@@ -1,7 +1,4 @@
--- quality-toggle.lua — MaxQuality opt-in toggle (Alt+q)
--- Holds toggle state in Lua (cycle-values is a no-op on undefined user-data
--- props) and mirrors it to user-data/maxq, which profiles/maxquality.conf
--- reads via get("user-data/maxq","no")=="yes". Initialized OFF at startup.
+-- quality-toggle.lua - Alt+q toggles [MaxQuality] via user-data/maxq (off at startup).
 local msg = require 'mp.msg'
 
 local enabled = false

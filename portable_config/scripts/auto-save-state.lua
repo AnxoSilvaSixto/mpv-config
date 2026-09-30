@@ -1,6 +1,5 @@
--- Owned locally (frozen 2026-09-11, not auto-synced): upstream
--- https://github.com/popeyeurs/ulyssescaballes-mpv.config/blob/main/portable_config/scripts/auto-save-state.lua
--- Save state in multiple scenarios and control deletion
+-- auto-save-state.lua - owned locally, frozen (not auto-synced). Saves position every 1s.
+-- Respects [ending]: no writes in the last 60s.
 local options = {
     timer_enabled = true,
     auto_save_interval = 1,
@@ -10,9 +9,7 @@ local options = {
 mp.options = require 'mp.options'
 mp.options.read_options(options, "auto-save-state")
 
--- Ending-window awareness (mirrors the [ending] auto-profile: last 60s of a
--- file). This script must not re-save position -- or re-enable core saving --
--- where [ending] deliberately disabled it. Marker: _ending_aware_patched
+-- Last 60s belong to [ending]: freeze writes there.
 local function in_ending_window()
     local dur = mp.get_property_number("duration", 0)
     if dur <= 0 then return false end
@@ -26,8 +23,6 @@ local idle = false
 local eof_reached
 
 local function save()
-    -- [ending] owns the last 60s: freeze the entry (no writes) instead of
-    -- refreshing it; core skips its own quit-save there via save-position=no.
     if in_ending_window() then return end
     if not idle and (not eof_reached or eof_reached and not options.delete_finished) then
         mp.command("write-watch-later-config")

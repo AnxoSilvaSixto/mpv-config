@@ -1,11 +1,5 @@
--- betterchapters.lua
--- Seek to next/previous chapter. When no more chapters exist in that
--- direction, fall through to playlist_next / playlist_prev.
---
--- Keybind names: chapter_next, chapter_prev
--- Bind in input.conf:
---   z  script-binding media/chapter_next
---   Z  script-binding media/chapter_prev
+-- betterchapters.lua - chapter seek with playlist fall-through at ends.
+-- Binds: z/Z in input.conf (script-binding media/chapter_next/prev).
 
 function chapter_seek(direction)
     local chapters = mp.get_property_number("chapters")

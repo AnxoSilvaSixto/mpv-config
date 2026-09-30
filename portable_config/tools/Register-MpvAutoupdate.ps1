@@ -1,22 +1,17 @@
 <#
 .SYNOPSIS
-    One-time setup: registers the daily mpv/hdr-toys/uosc update as a
-    Scheduled Task that runs at login. Run this once, manually, yourself.
+    Registers the updater as a logon Scheduled Task. Run once.
 .NOTES
-    Does NOT need admin rights - "at log on" tasks run in your own user
-    context, which is also why login (not raw system startup) is used:
-    your network/proxy settings are only available once you've logged in,
-    so a true pre-login "at startup" trigger would frequently fire before
-    the network is up and just fail silently.
+    No admin needed. Logon (not startup) so network is up. 1-min delay.
 #>
 
 $Action = New-ScheduledTaskAction -Execute 'powershell.exe' `
     -Argument '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$PSScriptRoot\Update-MpvEnvironment.ps1"'
 
 $Trigger = New-ScheduledTaskTrigger -AtLogOn
-$Trigger.Delay = 'PT1M'   # 1-minute delay after login, so networking has time to come up before the first request fires
+$Trigger.Delay = 'PT1M'
 
-$Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopOnIdleEnd -ExecutionTimeLimit (New-TimeSpan -Minutes 15) -MultipleInstances IgnoreNew   # belt-and-suspenders alongside the script's own mutex: Task Scheduler itself won't start a second copy if one is already running
+$Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopOnIdleEnd -ExecutionTimeLimit (New-TimeSpan -Minutes 15) -MultipleInstances IgnoreNew
 
 Register-ScheduledTask -TaskName 'mpv-autoupdate' `
     -Action $Action -Trigger $Trigger -Settings $Settings `

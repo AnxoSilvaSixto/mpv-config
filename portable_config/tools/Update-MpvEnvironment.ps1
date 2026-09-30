@@ -1,32 +1,19 @@
 <#
 .SYNOPSIS
-    Daily updater for mpv, hdr-toys, uosc, thumbfast, anime-build (mpvSockets, skip_intro, track-selector, SSim).
+    Updater for mpv, hdr-toys, uosc, thumbfast, anime-build scripts.
 .DESCRIPTION
-    Checks each of the six against its upstream source and only downloads
-    when something actually changed - safe to run on every login, since an
-    unchanged day is just quick API calls and a log line.
-
-    Never touches: mpv.conf, input.conf, script-opts\, or anything else in
-    portable_config\ outside the paths listed in each Update-GitFolder call
-    below - which, as of 2026-08-25, includes hdr-toys.conf itself.
+    Downloads only on change - safe to run every login.
+    Never touches mpv.conf, input.conf, or script-opts/.
 .NOTES
-    Requires 7-Zip (7z.exe) on PATH or in the default install location, for
-    the mpv step only - hdr-toys and uosc are plain .zip and need nothing
-    extra. Get 7-Zip from https://www.7-zip.org if you don't have it; the
-    mpv step logs a message and skips itself (does not fail the run) until
-    you do.
+    Needs 7-Zip for the mpv step only. Without it, mpv step skips.
 #>
 
-# ===== Configuration you may want to change =====
+# ===== User setting =====
 
-# CHANGE THIS if your mpv build is not from zhongfly/mpv-winbuild. The only
-# other value this script understands is 'shinchiro/mpv-winbuild-cmake' -
-# both publish daily builds under the same mpv-x86_64-<date>-git-<hash>.7z
-# naming, so this is the only line that differs between them.
+# mpv build repo. Only other value understood: 'shinchiro/mpv-winbuild-cmake'.
 $MpvRepo = 'zhongfly/mpv-winbuild'
 
-# ===== Fixed configuration =====
-# Derive the portable root from this script so the checkout can be relocated.
+# ===== Fixed paths (root auto-derived, folder is relocatable) =====
 $ScriptRoot  = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $ConfigDir   = Split-Path -Parent $ScriptRoot
 $MpvRoot     = Split-Path -Parent $ConfigDir
@@ -38,35 +25,20 @@ $StateFile   = Join-Path $ToolsDir 'update-state.json'         # remembers what 
 $LogFile     = Join-Path $ToolsDir 'update-log.txt'
 $WorkDir     = Join-Path $env:TEMP 'mpv-autoupdate'            # scratch space, cleaned up after each run
 
-$HdrToysRepo   = 'natural-harmonia-gropius/hdr-toys'              # matches the shaders already in shaders\hdr-toys\
-$UoscRepo      = 'tomasklaen/uosc'                                # upstream uosc (fork was stale, last push 2026-08-17)
-$ThumbfastRepo = 'po5/thumbfast'                                  # single file at the repo root - verified default branch below, 2026-08-19
-$AnimeBuildRepo = 'Chinna95P/mpv-anime-build'                     # vendored mpvSockets.lua + skip_intro.lua + track-selector.lua + SSim shaders - branch 'main' (not $Branch)
-$AnimeBuildBranch = 'main'                                        # Chinna95P default branch; kept separate so $Branch ('master') stays untouched
-$Branch        = 'master'                                         # default branch for hdr-toys and thumbfast; uosc overrides via -RepoBranch 'main'
-
-# ===== AGENTS.md: Chinna95P/mpv-anime-build vendored scripts (Fix 3, 2026-09-07) =====
-# Syncs portable_config/scripts/utilities/mpvSockets.lua + portable_config/scripts/media/skip_intro.lua
-# from https://raw.githubusercontent.com/Chinna95P/mpv-anime-build/main/scripts/<name>, tracked by commit
-# SHA in update-state.json key 'animebuild' (backfilled with the other keys in Get-State).
-# Transforms mirror the hdr-toys jedypod precedent: mpvSockets.lua syncs VERBATIM except its provenance
-# comment ('-- Source: Chinna95P/mpv-anime-build (scripts/mpvSockets.lua)') is re-appended after download;
-# skip_intro.lua gets a FAIL-LOUD color-swap of the upstream label hexes (verified 2026-09-07 via curl:
-# Intro FF00FF->3f5a9c, OP 00FF00->abc2c9, PV 0099FF->48628a, ED FF8000->6a8faf)
-# plus a managed header.
-# Missing color block => warn + keep prior file, never half-write. Keywords are restructured/lowercased
-# local sets, functionally near-equivalent to upstream under case-insensitive match; they mirror
-# script-opts/uosc.conf chapter_range_patterns (openings/endings/outros/intros) - realign in uosc.conf,
-# not here. Per-component all-or-nothing + atomic temp-file replace; mutex/log rotation untouched.
+$HdrToysRepo   = 'natural-harmonia-gropius/hdr-toys'
+$UoscRepo      = 'tomasklaen/uosc'
+$ThumbfastRepo = 'po5/thumbfast'
+$AnimeBuildRepo = 'Chinna95P/mpv-anime-build'
+$AnimeBuildBranch = 'main'
+$Branch        = 'master' # hdr-toys + thumbfast; uosc overrides with 'main'
 
 # ===== Setup =====
-New-Item -ItemType Directory -Force -Path $ToolsDir, $WorkDir | Out-Null   # ensure log/state/scratch folders exist
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12  # older PowerShell defaults to TLS 1.0, GitHub requires 1.2+
-$ProgressPreference = 'SilentlyContinue'   # Invoke-WebRequest's progress-bar rendering is known to be extremely slow (can look like a hang) under Task Scheduler's hidden window
-$GhHeaders = @{ 'User-Agent' = 'mpv-autoupdate-script' }        # GitHub's API rejects requests with no User-Agent
+New-Item -ItemType Directory -Force -Path $ToolsDir, $WorkDir | Out-Null
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$ProgressPreference = 'SilentlyContinue' # progress bar is very slow under Task Scheduler
+$GhHeaders = @{ 'User-Agent' = 'mpv-autoupdate-script' } # GitHub API requires a User-Agent
 
 function Write-Log {
-    # Timestamps every line so update-log.txt reads as a history, not just today's run.
     param([string]$Message)
     $line = "[{0}] {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Message
     Add-Content -Path $LogFile -Value $line
@@ -74,7 +46,7 @@ function Write-Log {
 }
 
 function Get-State {
-    # State = last-installed version/commit per component, so unchanged days do zero downloading.
+    # Last-installed version per component, so unchanged days skip downloading.
     $defaults = [pscustomobject]@{ mpv = ''; hdrtoys = ''; uosc = ''; thumbfast = ''; animebuild = '' }
     if (Test-Path $StateFile) {
         try {
@@ -83,16 +55,10 @@ function Get-State {
                 throw 'state JSON must contain one object'
             }
 
-            # Copy only known scalar fields. This backfills older state files and avoids
-            # trusting arbitrary JSON members when the file was edited or truncated.
-            # 'animebuild' (anime-build scripts, Fix 3) backfills here too when missing.
+            # Copy only known fields; backfills older files, ignores unknown members.
             foreach ($prop in $defaults.PSObject.Properties.Name) {
                 $value = $loaded.PSObject.Properties[$prop]
-                # Added 2026-09-06: on 2026-09-05 hdrtoys was found on disk as
-                # '0000...0000' (git's own "no commit" sentinel - never a value this
-                # script writes itself) between two otherwise-clean runs, causing a
-                # pointless resync. Treat that one specific value the same as a missing
-                # key instead of trusting it, whatever wrote it.
+                # All-zero SHA is git's "no commit" sentinel - never trust it.
                 if ($value -and ($null -ne $value.Value) -and ([string]$value.Value) -ne ('0' * 40)) {
                     $defaults.$prop = [string]$value.Value
                 }
@@ -112,8 +78,7 @@ function Save-State {
     try {
         $json = $State | ConvertTo-Json -Depth 3
         [System.IO.File]::WriteAllText($tempState, $json, (New-Object System.Text.UTF8Encoding($false)))
-        # Fixed 2026-09-08: [IO.File]::Replace($temp,$dest,$null) throws "path invalid" on this PS/.NET (even with "" backup)
-        # Move-Item -Force is atomic enough for this single-writer (mutex-guarded) state file and avoids the .NET overload issue.
+        # Move-Item is atomic enough for this single-writer (mutex-guarded) file.
         Move-Item -Path $tempState -Destination $StateFile -Force
     } finally {
         Remove-Item $tempState -Force -ErrorAction SilentlyContinue
@@ -122,7 +87,7 @@ function Save-State {
 
 $State = Get-State
 
-# ===== mpv itself: GitHub Releases, .7z asset =====
+# ===== mpv: GitHub Releases .7z =====
 function Update-Mpv {
     try {
         $release = Invoke-RestMethod "https://api.github.com/repos/$MpvRepo/releases/latest" -Headers $GhHeaders
@@ -131,23 +96,17 @@ function Update-Mpv {
             return $true
         }
 
-        # Matches the AVX2 (x86-64-v3) player build. Changed 2026-08-23 from the plain
-        # '^mpv-x86_64-...' pattern -- the 5700X (Zen 3) supports the full v3 feature set
-        # (AVX2/BMI2/FMA), so this runs natively instead of the baseline codepath. Revert to
-        # '^mpv-x86_64-\d{8}-git-[0-9a-f]+\.7z$' if this config ever moves to non-v3 hardware.
+        # x86_64-v3 only (Zen 3). No fallback to baseline.
         $asset = $release.assets |
             Where-Object { $_.name -match '^mpv-x86_64-v3-\d{8}-git-[0-9a-f]+\.7z$' } |
             Select-Object -First 1
         if (-not $asset) {
-            # Observed 2026-08-27: release 2026-08-26-182fa6ca49 shipped no v3 asset at all --
-            # self-corrected on the next build the same day. Deliberately not falling back to the
-            # plain build on days like this: v3-only was a considered choice (performance over
-            # always-latest), so this just waits for the next release that has a v3 asset instead.
+            # v3-only is intentional; wait for the next release with a v3 asset.
             Write-Log "mpv: no matching x86_64 asset in release $($release.tag_name) - skipping this run"
             return $false
         }
 
-        # 7-Zip lookup: PATH first, then the two standard install locations.
+        # 7-Zip: PATH first, then standard locations.
         $SevenZip = (Get-Command 7z.exe -ErrorAction SilentlyContinue).Source
         if (-not $SevenZip) {
             $SevenZip = @("$env:ProgramFiles\7-Zip\7z.exe", "${env:ProgramFiles(x86)}\7-Zip\7z.exe") |
@@ -166,11 +125,7 @@ function Update-Mpv {
         Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
         & $SevenZip x $archivePath "-o$extractDir" -y | Out-Null
 
-        # /XD portable_config: even though these builds don't currently ship one, this
-        # guarantees a future build never overwrites your live config by surprise.
-        # /XD doc installer: upstream docs + legacy installer are droppings, never source.
-        # /XF launchers + legacy state: updater.bat and mpv-register/unregister.bat are
-        # owned locally (sole-updater dispatch); settings.xml/updater.ps1 are retired legacy.
+        # Never overwrite portable_config; skip upstream docs/installer/launchers.
         robocopy $extractDir $MpvRoot /E /XD portable_config doc installer /XF updater.bat mpv-register.bat mpv-unregister.bat settings.xml updater.ps1 /NFL /NDL /NJH /NJS | Out-Null
         if ($LASTEXITCODE -ge 8) {
             throw "robocopy failed with exit code $LASTEXITCODE"
@@ -187,22 +142,18 @@ function Update-Mpv {
     }
 }
 
-# ===== hdr-toys / uosc / thumbfast: plain git repos, tracked by latest commit SHA =====
+# ===== Git repos, tracked by commit SHA =====
 function Update-GitFolder {
     param(
         [string]$Repo,
         [string]$StateKey,
-        [hashtable[]]$Paths,   # each: @{ Source = 'relative\path\in\repo'; Dest = 'relative\path\in\portable_config'; IsDir = $true/$false }
-        [string]$RepoBranch = $Branch   # override default branch per-repo (uosc upstream uses 'main', others use 'master')
+        [hashtable[]]$Paths,   # @{ Source='repo\path'; Dest='config\path'; IsDir=$true/$false }
+        [string]$RepoBranch = $Branch
     )
     try {
         $commit = Invoke-RestMethod "https://api.github.com/repos/$Repo/commits/$RepoBranch" -Headers $GhHeaders
         $sha = $commit.sha
         if ([string]::IsNullOrEmpty($sha) -or $sha -eq ('0' * 40)) {
-            # Added 2026-09-06: belt-and-suspenders alongside the Get-State check above -
-            # a healthy GitHub response should never give a null/empty sha or the all-zero
-            # sentinel. If this ever fires, it points at the API/response side rather than
-            # the on-disk state file.
             Write-Log "$Repo`: API returned an invalid commit reference ('$sha') - skipping this run, will retry next time"
             return $false
         }
@@ -227,18 +178,11 @@ function Update-GitFolder {
                 throw "source path not found in $Repo`: $($p.Source)"
             }
             if ($p.IsDir) {
-                Remove-Item $dst -Recurse -Force -ErrorAction SilentlyContinue   # wholesale replace, matching upstream's own update pattern
+                Remove-Item $dst -Recurse -Force -ErrorAction SilentlyContinue
                 Copy-Item $src $dst -Recurse -Force -ErrorAction Stop
             } elseif ($p.Transforms) {
-                # Text transforms instead of a byte-for-byte copy (each: @{Find=...; Replace=...},
-                # applied in order; optional Required=$true throws FAIL-LOUD when Find matches
-                # nothing, since -replace otherwise silently no-ops on a missing pattern).
-                # Added 2026-08-25 for hdr-toys.conf: hdr-toys now keeps its portable ~~/
-                # shader paths verbatim (audit-verified); the sole transform is
-                # bottosson -> jedypod per upstream v2504 release notes (Required=$true so a
-                # missing pattern fails loud), since upstream's own hdr-toys.conf hasn't
-                # caught up to its v2504 notes on that point.
-                # Optional Header field prepends a comment block after transforms (hdr-toys.conf).
+                # Text transforms (Find/Replace; Required fails loud on no match).
+                # hdr-toys: bottosson -> jedypod per upstream v2504 notes.
                 New-Item -ItemType Directory -Force -Path (Split-Path $dst) | Out-Null
                 $text = Get-Content $src -Raw -ErrorAction Stop
                 foreach ($t in $p.Transforms) {
@@ -268,12 +212,7 @@ function Update-GitFolder {
 
 # ===== Run =====
 
-# Prevents two triggers overlapping (e.g. the at-logon trigger firing while you've
-# just manually run Start-ScheduledTask to test it) from racing on the same temp
-# files - which is exactly what happened on 2026-08-16: two runs both grabbed
-# 'mpv: updating', and the second one's cleanup stepped on the first one's
-# in-progress download. If another instance already holds this lock, this one
-# exits immediately rather than fighting over $WorkDir.
+# Mutex: a second instance exits immediately instead of racing on temp files.
 $Mutex = New-Object System.Threading.Mutex($false, 'Global\mpv-autoupdate-lock')
 if (-not $Mutex.WaitOne(0)) {
     Write-Log "another instance is already running - exiting"
@@ -285,17 +224,14 @@ Write-Log "=== update run starting ==="
 
 Update-Mpv
 
-# Changed 2026-08-25: hdr-toys.conf is now synced too, not just the shaders folder - mpv.conf
-# includes it directly (include=) instead of hand-porting its profiles, after the hand-port
-# silently fell a version behind once already (bottosson stayed loaded for days after upstream
-# switched its default to jedypod). See mpv.conf's HDR handling comment for the full reasoning.
+# hdr-toys.conf is synced (not hand-ported) so it can't fall behind upstream.
 Update-GitFolder -Repo $HdrToysRepo -StateKey 'hdrtoys' -Paths @(
     @{ Source = 'shaders\hdr-toys'; Dest = 'shaders\hdr-toys'; IsDir = $true }
             @{ Source = 'hdr-toys.conf'; Dest = 'hdr-toys.conf'; IsDir = $false;
                Transforms = @(
                    @{ Find = [regex]::Escape('gamut-mapping/bottosson.glsl'); Replace = 'gamut-mapping/jedypod.glsl' }
                );
-               Header = "# !!! AUTO-MANAGED by Update-MpvEnvironment.ps1 !!!`r`n# This file is synced from upstream hdr-toys on every update run.`r`n# Any manual edits will be LOST on the next update.`r`n# To customize HDR behavior, edit mpv.conf profiles instead.`r`n" }
+               Header = "# AUTO-MANAGED by Update-MpvEnvironment.ps1 - do not edit.`r`n" }
 )
 
 Update-GitFolder -Repo $UoscRepo -StateKey 'uosc' -RepoBranch 'main' -Paths @(
@@ -309,8 +245,7 @@ Update-GitFolder -Repo $ThumbfastRepo -StateKey 'thumbfast' -Paths @(
     @{ Source = 'thumbfast.lua'; Dest = 'scripts\thumbfast.lua'; IsDir = $false }
 )
 
-# AnimeBuild (Fix 3, 2026-09-07): mpvSockets.lua syncs verbatim except its provenance
-# header; skip_intro.lua gets the FAIL-LOUD NieR color-swap plus a managed header.
+# AnimeBuild: mpvSockets + skip_intro (NieR palette) + track-selector + SSim.
 Update-GitFolder -Repo $AnimeBuildRepo -StateKey 'animebuild' -RepoBranch $AnimeBuildBranch -Paths @(
     @{ Source = 'scripts\mpvSockets.lua'; Dest = 'scripts\utilities\mpvSockets.lua'; IsDir = $false;
        Header = "-- Source: Chinna95P/mpv-anime-build (scripts/mpvSockets.lua)`r`n" }
@@ -328,23 +263,12 @@ Update-GitFolder -Repo $AnimeBuildRepo -StateKey 'animebuild' -RepoBranch $Anime
     @{ Source = 'shaders\SSimDownscaler.glsl'; Dest = 'shaders\SSimDownscaler.glsl'; IsDir = $false }
 )
 
-# Manually-managed shaders (never synced, never deleted by this script):
-# KrigBilateral.glsl, FSRCNNX_x2_16-0-4-1.glsl, ArtCNN_*_DN.glsl, hdeband.glsl,
-# noise_static_luma.hook — vetted A/B alternatives, see AGENTS.md verdicts.
-# Sources: igv gist/releases, Artoriuz/ArtCNN GLSL, AN3223/dotfiles,
-# iwalton3/default-shader-pack. To update one: download, verify //!HOOK, A/B.
+# Manually-managed (never synced): KrigBilateral, FSRCNNX, ArtCNN DN, hdeband,
+# noise_static_luma.hook - see AGENTS.md. auto-save-state.lua is frozen locally.
 #
-# auto-save-state.lua is OWNED LOCALLY (frozen 2026-09-11): no longer synced, so
-# upstream rewrites can never clobber the ending-window awareness ([ending] owns
-# last 60s). Upstream source, for manual monitoring only:
-# https://github.com/popeyeurs/ulyssescaballes-mpv.config/blob/main/portable_config/scripts/auto-save-state.lua
-# To adopt an upstream change: diff, port what matters, re-apply the ending
-# guards, then verify with tests/test-session.ps1.
+# To update a manual shader: download, verify //!HOOK, A/B test.
 
-# Post-process track-selector to preserve es dub -> no subs patch (faithful to slang=es-ES priority)
-# If upstream overwrote our es block, re-inject it. Idempotent: only patches if marker missing.
-# Spanish detection is spa-aware (es-* and spa tags); variant priority (es-ES > es/spa > es-419)
-# lives in matches_lang/normalize_lang (separate post-process block below).
+# Re-apply es dub patch if upstream overwrote it. Idempotent.
 try {
     $trackSelectorPath = Join-Path $ConfigDir 'scripts\track-selector.lua'
     if (Test-Path $trackSelectorPath) {
@@ -354,14 +278,13 @@ try {
         } else {
             Write-Log "track-selector: re-applying es dub patch (Spanish audio -> no subs)"
             $trackSelectorPatched = $false
-            # Current layout (2026-09+): selected_audio_lang is initialized to "" then populated via loop;
-            # inject before the CONTEXT DETECTION marker which exists in all recent versions.
+            # Current layout: selected_audio_lang populated via loop; inject before CONTEXT DETECTION.
             if ($trackContent -match "-- 2\. CONTEXT DETECTION") {
                 $esBlock = "    -- faithful to user slang=es-ES priority: if we selected Spanish audio, don't show subs`r`n    if selected_audio_lang and (selected_audio_lang:find('^es') or selected_audio_lang:find('^spa')) then`r`n        msg.info('Smart Sub: Spanish audio detected (' .. selected_audio_lang .. ') -> disabling subs per es dub rule')`r`n        if mp.get_property('sid') ~= 'no' then`r`n            mark_internal_change('subtitle', 'no')`r`n            mp.set_property('sid', 'no')`r`n        end`r`n        return`r`n    end`r`n    local _es_patched = true`r`n`r`n    -- 2. CONTEXT DETECTION"
                 $trackContent = $trackContent -replace "-- 2\. CONTEXT DETECTION", $esBlock
                 $trackSelectorPatched = $true
             } elseif ($trackContent -match "local selected_audio_lang = mp\.get_property\('audio-params/lang'\)") {
-                # Legacy fallback: very old file used mp.get_property('audio-params/lang') inline
+                # Legacy fallback for old file layout.
                 $trackContent = $trackContent -replace "local selected_audio_lang = mp.get_property\('audio-params/lang'\)", "local selected_audio_lang = mp.get_property('audio-params/lang')`r`n    -- faithful to user slang=es-ES priority: if we selected Spanish audio, don't show subs`r`n    if selected_audio_lang and (selected_audio_lang:find('^es') or selected_audio_lang:find('^spa')) then`r`n        msg.info('Smart Sub: Spanish audio detected (' .. selected_audio_lang .. ') -> disabling subs per es dub rule')`r`n        local selected_sid = 'no'`r`n        mark_internal_change('sid', selected_sid)`r`n        msg.info('Smart Sub: Spanish audio ...')`r`n        return`r`n    end`r`n    local _es_patched = true"
                 $trackSelectorPatched = $true
             } else {
@@ -382,9 +305,7 @@ try {
     Write-Log "track-selector: patch failed, continuing anyway so state still gets saved - $($_.Exception.Message)"
 }
 
-# Post-process track-selector: Spanish-variant priority (es-ES > es/spa > es-419).
-# Re-applies normalize_lang/matches_lang/is_spanish_lang if upstream overwrote them.
-# Idempotent: only patches if marker missing.
+# Re-apply Spanish-variant priority (es-ES > es/spa > es-419). Idempotent.
 try {
     if (Test-Path $trackSelectorPath) {
         $tsLangContent = [System.IO.File]::ReadAllText($trackSelectorPath)
@@ -396,11 +317,8 @@ local function matches_lang(track_lang, pref_lang)
     if not track_lang then return false end
     return string.sub(track_lang, 1, string.len(pref_lang)) == pref_lang
 end'
-            $tsLangNew = '-- Spanish-variant priority (_es_lang_priority_patched): es-ES > es/spa > es-419.
--- Normalizes ISO 639-1/2 (spa~es, eng~en, jpn~ja) so mkv "spa" tags match "es"
--- prefs. A pref WITH a region (es-ES) requires an exact variant match; a
--- generic pref (es) matches any same-base track. Combined with
--- slang=es-ES,es,spa,es-419 ordering, Spain Spanish always wins over Latin.
+            $tsLangNew = '-- Spanish priority (_es_lang_priority_patched): es-ES > es/spa > es-419.
+-- spa~es, eng~en, jpn~ja. Regional pref needs exact match; generic matches same base.
 local function normalize_lang(lang)
     if not lang then return "" end
     lang = lang:lower():gsub("_", "-")
@@ -425,8 +343,6 @@ local function matches_lang(track_lang, pref_lang)
     local t = normalize_lang(track_lang)
     local p = normalize_lang(pref_lang)
     if t == p then return true end
-    -- Generic pref (no region) matches any same-base track (es matches
-    -- es-es/es-419/spa); regional pref requires exact variant match.
     if not p:find("-", 1, true) then
         return lang_base(t) == p
     end
@@ -437,12 +353,7 @@ local function is_spanish_lang(lang)
     return lang_base(normalize_lang(lang or "")) == "es"
 end
 
--- Tiered match for deterministic variant priority: 0 = exact/equivalent
--- (es-ES~es-ES, es~es, spa~es), 1 = base fallback (generic es pref vs es-419
--- or es-MX track), -1 = no match. Regional prefs never fuzzy-match.
--- NOTE: the per-pref best-tier scan in select_smart_tracks (audio, anime
--- dialogue, clean, SDH loops) is NOT re-applied by this block; if upstream
--- rewrites those loops, re-port the tier scan manually (see repo diff).
+-- 0 = exact, 1 = base fallback, -1 = no match. Regional prefs never fuzzy-match.
 local function match_tier(track_lang, pref_lang)
     local t = normalize_lang(track_lang)
     local p = normalize_lang(pref_lang)
@@ -473,11 +384,9 @@ end'
     Write-Log "track-selector: lang-priority patch failed, continuing anyway - $($_.Exception.Message)"
 }
 
-# Post-process track-selector: teardown guard (ignore aid/sid changes with no
-# active playback). Idempotent: only patches if marker missing.
+# Teardown guard: ignore aid/sid changes with no active playback. Idempotent.
 try {
     if (Test-Path $trackSelectorPath) {
-        # ReadAllText keeps UTF-8 round-trip safe (see uosc block below).
         $tsGuardContent = [System.IO.File]::ReadAllText($trackSelectorPath)
         if ($tsGuardContent -match '_eof_guard_patched') {
             # already patched, skip
@@ -488,8 +397,7 @@ try {
             $tsGuardNew = '    if not track_selector_enabled or ignore_track_changes or file_transition then
         return
     end
-    -- Teardown guard (_eof_guard_patched): track-list teardown at end-file fires
-    -- these observers with no active file -- never misclassify that as a manual change.
+    -- Teardown guard (_eof_guard_patched): ignore observer fire with no active file.
     if mp.get_property("path") == nil or mp.get_property_native("core-idle")
             or #(mp.get_property_native("track-list") or {}) == 0 then
         return
@@ -514,10 +422,7 @@ try {
     Write-Log "track-selector: teardown-guard patch failed, continuing anyway - $($_.Exception.Message)"
 }
 
-# Post-process track-selector: warn if the end-file/shutdown mute is absent
-# (the eof_guard block above re-applies automatically and remains the primary
-# teardown defense; the mute is an extra that a sync may drop).
-# Idempotent: silent when the marker is present.
+# Warn if end-file mute is absent (teardown guard above is the primary defense).
 try {
     if (Test-Path $trackSelectorPath) {
         $tsMuteContent = [System.IO.File]::ReadAllText($trackSelectorPath)
@@ -530,14 +435,10 @@ try {
 } catch {
     Write-Log "track-selector: teardown-mute patch failed, continuing anyway - $($_.Exception.Message)"
 }
-# uosc 5.13 requests 'MaterialIconsRound-Regular' but the font it ships declares
-# 'Material Symbols Rounded'; with no match, ligature names render as raw text
-# ("chevron_right" instead of the glyph). Idempotent: skips if already aligned.
+# uosc icon font must match shipped ttf, else ligatures render as raw text. Idempotent.
 try {
     $uoscAssPath = Join-Path $ConfigDir 'scripts\uosc\lib\ass.lua'
     if (Test-Path $uoscAssPath) {
-        # ReadAllText (UTF-8) — Get-Content would decode as ANSI and mojibake
-        # the file's non-ASCII bytes on write-back.
         $assContent = [System.IO.File]::ReadAllText($uoscAssPath)
         if ($assContent -match "'Material Symbols Rounded'") {
             # already aligned, skip
@@ -559,12 +460,7 @@ try {
     Write-Log "uosc: icon-family patch failed, continuing anyway - $($_.Exception.Message)"
 }
 
-# Post-process uosc track menu (subtitles/audio/video lists): friendly language
-# names, SDH hint, underscore cleanup in titles. scripts/uosc is
-# wholesale-replaced on every uosc update, so re-apply the menus.lua patch when
-# the marker is absent. Idempotent: skips if already patched. All-or-nothing
-# write-back: a partial patch (e.g. friendly_lang call without its definition)
-# would break the menu, so any missed anchor aborts with a layout log.
+# uosc track menu: friendly language names + SDH hint + title cleanup. Idempotent.
 try {
     $uoscMenusPath = Join-Path $ConfigDir 'scripts\uosc\lib\menus.lua'
     if (Test-Path $uoscMenusPath) {
@@ -573,18 +469,13 @@ try {
             # already patched, skip
         } else {
             Write-Log 'uosc: re-applying track-menu language-names patch'
-            # menus.lua is eol=lf (see .gitattributes); normalize so multi-line
-            # anchors match regardless of working-tree flips. This .ps1 itself
-            # is CRLF, so the here-string helper needs the same treatment.
+            # menus.lua is LF; normalize so multi-line anchors match.
             $menusContent = $menusContent -replace "`r`n", "`n"
             $T2 = "`t`t"
             $T4 = "`t`t`t`t"
             $T5 = "`t`t`t`t`t"
             $menusHelper = @'
-		-- Friendly language names for track hints (_uosc_lang_names_patched).
-		-- Raw BCP47 tags (es-419, zh-Hans) are hard to scan when many tracks
-		-- share one title (e.g. a dozen "CR" rows); show a readable name and
-		-- fall back to the raw tag when unmapped.
+		-- Readable language names (_uosc_lang_names_patched). Falls back to raw tag.
 		local lang_names = {
 			['es'] = 'Spanish', ['es-es'] = 'Spanish (Spain)', ['es-419'] = 'Spanish (Latin America)',
 			['es-mx'] = 'Spanish (Mexico)', ['es-ar'] = 'Spanish (Argentina)', ['es-us'] = 'Spanish (US)',
@@ -603,8 +494,7 @@ try {
 		local function friendly_lang(tag)
 			if not tag or tag == '' then return tag end
 			local key = tag:lower():gsub('_', '-')
-			-- ISO 639-2 three-letter equivalents (spa~es, eng~en, jpn~ja)
-			local base = key:match('^([a-z]+)')
+			local base = key:match('^([a-z]+)') -- spa~es, eng~en, jpn~ja
 			if base == 'spa' then key = 'es' .. key:sub(4)
 			elseif base == 'eng' then key = 'en' .. key:sub(4)
 			elseif base == 'jpn' then key = 'ja' .. key:sub(4)
@@ -615,11 +505,9 @@ try {
 '@
             $menusHelper = $menusHelper -replace "`r`n", "`n"
             $menusOk = $true
-            # 1. helper before the track loop (anchor must hit exactly once)
+            # 1. helper before the track loop (must hit exactly once)
             $menusLoopOld = "${T2}for _, track in ipairs(tracklist) do"
             if (([regex]::Matches($menusContent, [regex]::Escape($menusLoopOld))).Count -eq 1) {
-                # Here-string content ends with a single newline; add the blank
-                # separator line the checked-in file has before the loop.
                 $menusContent = $menusContent.Replace($menusLoopOld, $menusHelper + "`n" + $menusLoopOld)
             } else {
                 Write-Log 'uosc: menus patch skipped - track-loop anchor not unique (unexpected layout)'
@@ -644,7 +532,7 @@ try {
             # 4. underscore cleanup in display titles
             $menusTitleOld = "${T4}items[#items + 1] = {`n${T5}title = (track.title and track.title or t('Track %s', track.id)),"
             if ($menusContent.Contains($menusTitleOld)) {
-                $menusTitleNew = "${T4}-- Muxer titles use underscores as word separators (Latin_America_CR);`n${T4}-- render them with spaces. Display-only: track.title itself is untouched.`n${T4}local display_title = track.title or ''`n${T4}-- Strip Crunchyroll source tag: trailing standalone CR (`" CR`", `"_CR`",`n${T4}-- `"-CR`", or the whole title). Uppercase-only, separator-required, so`n${T4}-- `"actor`"/`"micro`"/`"sacro`" can never match.`n${T4}display_title = display_title:gsub('[%s_%-]+CR$', '')`n${T4}if display_title == 'CR' then display_title = '' end`n${T4}-- Strip muxer group tags: leading `"[Erai-raws]`"-style brackets.`n${T4}display_title = display_title:gsub('^%s*%[[^%]]+%]%s*', '')`n${T4}-- Muxer titles use underscores as word separators; display-only.`n${T4}display_title = display_title:gsub('_', ' '):gsub('^%s+', ''):gsub('%s+$', '')`n${T4}if display_title == '' then`n${T5}display_title = friendly_lang(track.lang) or t('Track %s', track.id)`n${T4}end`n${T4}items[#items + 1] = {`n${T5}title = display_title,"
+                $menusTitleNew = "${T4}-- Display-only cleanup: strip CR tag, [group] prefix, _ -> space.`n${T4}local display_title = track.title or ''`n${T4}display_title = display_title:gsub('[%s_%-]+CR$', '')`n${T4}if display_title == 'CR' then display_title = '' end`n${T4}display_title = display_title:gsub('^%s*%[[^%]]+%]%s*', '')`n${T4}display_title = display_title:gsub('_', ' '):gsub('^%s+', ''):gsub('%s+$', '')`n${T4}if display_title == '' then`n${T5}display_title = friendly_lang(track.lang) or t('Track %s', track.id)`n${T4}end`n${T4}items[#items + 1] = {`n${T5}title = display_title,"
                 $menusContent = $menusContent.Replace($menusTitleOld, $menusTitleNew)
             } else {
                 Write-Log 'uosc: menus patch skipped - title anchor not found (unexpected layout)'
@@ -667,10 +555,7 @@ try {
     Write-Log "uosc: menus patch failed, continuing anyway - $($_.Exception.Message)"
 }
 
-# Post-process portable launchers: robocopy now excludes updater.bat and
-# mpv-register/unregister.bat via /XF (see Update-Mpv above), so this block is
-# a safety net only — it restores the sole-updater dispatch if a stock archive
-# ever slips through. Idempotent per file; fail-loud per file.
+# Launchers: safety net restoring sole-updater dispatch. Idempotent per file.
 try {
     $launcherJobs = @(
         @{ File = 'updater.bat'; Marker = 'Update-MpvEnvironment' },
@@ -695,35 +580,26 @@ try {
         }
         $new = $null; $why = ''
         if ($job.File -eq 'updater.bat') {
-            # Sole-updater dispatch: any updater.bat without our marker is stock
-            # legacy (installer/updater.ps1 branch) — replace wholesale with the
-            # preferred dispatch template. EOL follows existing file.
+            # Any updater.bat without our marker is stock legacy - replace wholesale.
             Write-Log 'updater.bat: restoring sole-updater dispatch (Update-MpvEnvironment.ps1)'
             $new = @(
                 '@echo OFF',
-                ':: Primary entry point -> portable_config/tools/Update-MpvEnvironment.ps1 (sole updater).',
-                ':: Legacy installer/updater.ps1 is retired; ffmpeg/yt-dlp are out of scope (external tools).',
+                ':: Sole updater entry point -> portable_config/tools/Update-MpvEnvironment.ps1',
                 'pushd %~dp0',
                 'set updater_script="%~dp0portable_config\tools\Update-MpvEnvironment.ps1"',
                 '',
-                ':: Prefer pwsh (PowerShell 7+) when available, fall back to Windows PowerShell 5.1.',
                 'where pwsh >nul 2>nul',
                 'if %errorlevel% equ 0 (',
-                '    :: pwsh found, run with PowerShell 7+',
                 '    pwsh -NoProfile -NoLogo -ExecutionPolicy Bypass -File %updater_script%',
                 ') else (',
-                '    :: pwsh not found, run with Windows PowerShell 5.1',
                 '    powershell -NoProfile -NoLogo -ExecutionPolicy Bypass -File %updater_script%',
                 ')',
                 '',
-                ':: Capture the updater result now - later commands (timeout) would clobber %errorlevel%.',
                 'set updater_failed=%errorlevel%',
                 '',
-                ':: Legacy cleanup: remove stray root updater.ps1 left by old flows, if any.',
                 'if exist "%~dp0updater.ps1" (',
                 '    del "%~dp0updater.ps1"',
                 ')',
-                ':: Failures pause indefinitely so the error stays visible; success auto-closes.',
                 'if %updater_failed% neq 0 (',
                 '    echo Update failed with error %updater_failed% - leaving window open.',
                 '    pause',
@@ -775,26 +651,21 @@ try {
     Write-Log "launcher tweaks patch failed, continuing anyway - $($_.Exception.Message)"
 }
 
-# Added 2026-09-06: wrapped in try/catch. A run on 2026-09-06 12:20 checked every
-# component successfully but never reached Save-State or the "finished" line below -
-# nothing here logged why, so a hiccup in one of these three housekeeping steps
-# (locked file, deleted directory, etc.) is the only thing left that explains it.
-# None of this is essential to a successful update, so it must never be able to take
-# Save-State down with it - and if it does throw again, we'll see it in the log this time.
+# Housekeeping: never blocks state save.
 try {
-    # Clean shader cache files older than 30 days
+    # Shader cache >30d, watch-later >7d, log >500 lines.
     $shaderCacheDir = Join-Path $ConfigDir 'cache\shaders_cache'
     if (Test-Path $shaderCacheDir) {
         Get-ChildItem $shaderCacheDir -File | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-30) } | Remove-Item -Force -ErrorAction SilentlyContinue
     }
 
-    # Clean watch-later files older than 7 days
+    # Clean watch-later >7d
     $watchLaterDir = Join-Path $ConfigDir 'cache\watch_later'
     if (Test-Path $watchLaterDir) {
         Get-ChildItem $watchLaterDir -File | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) } | Remove-Item -Force -ErrorAction SilentlyContinue
     }
 
-    # Rotate log if exceeding 500 lines
+    # Rotate log >500 lines, keep last 400
     if ((Get-Content $LogFile).Count -gt 500) {
         $recent = Get-Content $LogFile -Tail 400
         $recent | Set-Content $LogFile
@@ -807,8 +678,6 @@ try {
 Save-State $State
 Write-Log "=== update run finished ==="
 } finally {
-    # Always release, even if something above threw - otherwise every future
-    # run would find the lock held and exit immediately, forever.
     $Mutex.ReleaseMutex()
     $Mutex.Dispose()
 }

@@ -1,3 +1,2 @@
--- Display scripts bundle entry point
--- change-refresh: automatic refresh rate matching
+-- display/ bundle loader.
 require './change-refresh'

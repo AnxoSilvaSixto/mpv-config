@@ -2,11 +2,8 @@
 .SYNOPSIS
     Read-only audit for this portable mpv tree.
 .DESCRIPTION
-    Validates the portable layout, JSON/XML metadata, script registration,
-    Git LFS pointer files, and a short mpv startup smoke test. It writes only
-    its temporary startup log outside the repository and does not alter config,
-    state, cache, or update logs.
-    Compatible with Windows PowerShell 5.1.
+    Checks layout, JSON/XML, scripts, LFS pointers, and mpv startup.
+    Writes only a temp log outside the repo. PowerShell 5.1 compatible.
 #>
 
 [CmdletBinding()]
@@ -37,7 +34,6 @@ function Check-Path([string]$RelativePath) {
 
 Write-Host "Auditing portable mpv root: $Root"
 
-# Required files and the standalone script layout.
 @(
     'portable_config',
     'portable_config/mpv.conf',
@@ -53,8 +49,7 @@ Write-Host "Auditing portable mpv root: $Root"
     'portable_config/tools/Set-RefreshRate.ps1'
 ) | ForEach-Object { Check-Path $_ }
 
-# Validator-only negative assertion: the obsolete media/thumbfast.lua path must
-# remain absent; it is not part of the current portable layout documentation.
+# Obsolete path must stay absent (thumbfast is top-level).
 $legacyThumbfast = Join-Path (Join-Path (Join-Path (Join-Path $Root 'portable_config') 'scripts') 'media') 'thumbfast.lua'
 if (Test-Path $legacyThumbfast) { Fail 'validator negative assertion: obsolete media/thumbfast.lua still exists; thumbfast must be top-level' }
 else { Pass 'validator negative assertion: obsolete media/thumbfast.lua is absent' }
@@ -67,7 +62,7 @@ $updater = Get-Content (Join-Path $Root 'portable_config/tools/Update-MpvEnviron
 if ($updater -match 'Dest\s*=\s*[''\"]scripts\\thumbfast\.lua[''\"]') { Pass 'updater destination is scripts/thumbfast.lua' }
 else { Fail 'updater destination is not scripts/thumbfast.lua' }
 
-# mpv.conf split includes check (Fix 11: profiles/res.conf + profiles/colorspace.conf)
+# mpv.conf includes
 $mpvConfPath = Join-Path $Root 'portable_config/mpv.conf'
 $mpvConf = Get-Content $mpvConfPath -Raw
 if ($mpvConf -match 'include="~~/profiles/res\.conf"' -and $mpvConf -match 'include="~~/profiles/colorspace\.conf"') { Pass 'mpv.conf includes profiles/res.conf and profiles/colorspace.conf' } else { Fail 'mpv.conf missing include="~~/profiles/res.conf" or include="~~/profiles/colorspace.conf"' }
@@ -76,14 +71,14 @@ Check-Path 'portable_config/profiles/res.conf'
 Check-Path 'portable_config/profiles/colorspace.conf'
 Check-Path 'portable_config/profiles/maxquality.conf'
 Check-Path 'portable_config/script-opts/anime-mode.conf'
-# Aggregate profile content for guards (mpv.conf + includes if present)
+# Aggregate profiles for guard check
 $profileSearchText = $mpvConf
 foreach ($p in @('portable_config/profiles/res.conf','portable_config/profiles/colorspace.conf')) { $pp = Join-Path $Root $p; if (Test-Path $pp) { $profileSearchText += "`n" + (Get-Content $pp -Raw) } }
 if ($profileSearchText -match 'profile-cond=get\("duration",0\)>0 and get\("time-remaining",0\)<=60') {
     Pass '[ending] profile has a positive duration guard'
 } else { Fail '[ending] profile is not guarded against idle activation' }
 
-# Parse PowerShell, JSON, and XML without executing updater side effects.
+# Syntax + JSON/XML (no side effects)
 foreach ($script in @('portable_config/tools/Update-MpvEnvironment.ps1', 'portable_config/tools/Set-RefreshRate.ps1', 'portable_config/tools/Audit-MpvEnvironment.ps1')) {
     try {
         [void][scriptblock]::Create((Get-Content (Join-Path $Root $script) -Raw))
@@ -100,13 +95,13 @@ $settingsPath = Join-Path $Root 'settings.xml'
 if (Test-Path $settingsPath) {
     try {
         [void][xml](Get-Content $settingsPath -Raw)
-        Warn 'settings.xml present (legacy retired; expected absent — remove to complete migration)'
+        Warn 'settings.xml present (legacy retired; expected absent - remove to complete migration)'
     } catch { Fail "settings.xml XML parse failed: $($_.Exception.Message)" }
 } else {
     Pass 'settings.xml absent (legacy removed, expected)'
 }
 
-# Launchers: sole-updater dispatch + deterministic register target
+# Launchers
 try {
     $updaterBat = Get-Content (Join-Path $Root 'updater.bat') -Raw
     if ($updaterBat -match 'Update-MpvEnvironment') { Pass 'updater.bat dispatches to Update-MpvEnvironment.ps1' }
@@ -124,7 +119,7 @@ foreach ($rb in @('mpv-register.bat','mpv-unregister.bat')) {
     } catch { Fail "$rb check failed: $($_.Exception.Message)" }
 }
 
-# hdr-toggle.lua: must exist and expose hdr-toys filtering via script-binding
+# hdr-toggle.lua
 $hdrTogglePath = Join-Path $Root 'portable_config/scripts/hdr-toggle.lua'
 if (-not (Test-Path $hdrTogglePath)) {
     Fail 'missing path: portable_config/scripts/hdr-toggle.lua'
@@ -136,16 +131,16 @@ if (-not (Test-Path $hdrTogglePath)) {
         else { Fail 'hdr-toggle.lua missing hdr-toys filter (must :find(''hdr-toys'',1,true))' }
         if ($hdrToggleRaw -match 'hdr-toggle') { Pass 'hdr-toggle.lua contains hdr-toggle binding name' }
         else { Fail 'hdr-toggle.lua missing hdr-toggle binding name' }
-        # script-binding style: must register script message or key binding so input.conf can do script-binding hdr-toggle/toggle
+        # Must register binding/message so input.conf can call it
         if (($hdrToggleRaw -match "mp\.add_key_binding\s*\([^\)]*'hdr-toggle'") -or ($hdrToggleRaw -match 'mp\.add_key_binding\s*\([^\)]*"hdr-toggle"') -or ($hdrToggleRaw -match "register_script_message\s*\(\s*['\""]toggle['\""]")) {
             Pass 'hdr-toggle.lua registers script-binding hdr-toggle/toggle'
         } else { Fail 'hdr-toggle.lua missing script-binding hdr-toggle registration (expected mp.add_key_binding ... hdr-toggle and register_script_message toggle)' }
-        # PowerShell syntax already checked above generically, but also ensure Lua is at least non-empty
+        # Lua must be non-empty
         if ($hdrToggleRaw.Length -lt 200) { Fail 'hdr-toggle.lua unexpectedly small' }
     } catch { Fail "hdr-toggle.lua read failed: $($_.Exception.Message)" }
 }
 
-# input.conf: Alt+h must delegate to hdr-toggle, not old 9-del chain
+# input.conf: Alt+h must delegate to hdr-toggle
 $inputConfPath = Join-Path $Root 'portable_config/input.conf'
 try {
     $inputRaw = Get-Content $inputConfPath -Raw
@@ -160,22 +155,20 @@ try {
         } else {
             Fail "input.conf Alt+h does not point to script-binding hdr-toggle: $altHLine"
         }
-        # Must not still contain old 9-del chain (detect known hdr-toys shader names on Alt+h line)
+        # Old chain = 9 dels on one line; any active change-list on Alt+h fails
         $hasOldChain = $false
         if ($altHLine -match 'change-list\s+glsl-shaders\s+del.*hdr-toys') { $hasOldChain = $true }
         if ($altHLine -match 'clip_both' -or $altHLine -match 'clip_black' -or $altHLine -match 'pq_inv.*hlg_inv' -or $altHLine -match 'bottosson') { $hasOldChain = $true }
-        # Heuristic: old chain had 9 del occurrences on same line
         $delCount = ([regex]::Matches($altHLine, 'change-list\s+glsl-shaders\s+del')).Count
         if ($delCount -ge 3) { $hasOldChain = $true }
         if ($hasOldChain) { Fail "input.conf Alt+h still uses old 9-del chain (must be single script-binding hdr-toggle/toggle): $altHLine" }
         else { Pass 'input.conf Alt+h is not old 9-del chain' }
     }
-    # Global guard: no Alt+h old chain anywhere even commented? Only check active (non-comment) lines for old chain
     $activeOldChain = @($inputLines | Where-Object { $_ -notmatch '^\s*#' -and $_ -match '^\s*Alt\+h' -and $_ -match 'change-list' })
     if ($activeOldChain.Count -gt 0) { Fail "input.conf has active Alt+h with change-list (should be script-binding only): $($activeOldChain -join '; ')" }
 } catch { Fail "input.conf check failed: $($_.Exception.Message)" }
 
-# fonts: ttf-only (uosc_icons.ttf + uosc_textures.ttf), no otf
+# fonts: ttf-only
 $fontsDir = Join-Path $Root 'portable_config/fonts'
 if (-not (Test-Path $fontsDir)) {
     Fail 'missing path: portable_config/fonts'
@@ -191,7 +184,7 @@ if (-not (Test-Path $fontsDir)) {
     else { Pass 'portable_config/fonts contains ttf-only (uosc_icons.otf absent)' }
 }
 
-# .github/workflows/audit.yml exists and references audit script
+# workflow references audit
 $workflowPath = Join-Path $Root '.github/workflows/audit.yml'
 if (-not (Test-Path $workflowPath)) {
     Fail 'missing path: .github/workflows/audit.yml'
@@ -204,11 +197,7 @@ if (-not (Test-Path $workflowPath)) {
     } catch { Fail "audit.yml read failed: $($_.Exception.Message)" }
 }
 
-# Detect, but do not modify, LFS pointer files. Refined expectations:
-# - ArtCNN/CfL/nlmeans/ravu are LFS (allowed pointers when not yet pulled)
-# - SSim*.glsl are plain text (never LFS) - 5-6 KB each
-# - KrigBilateral/FSRCNNX/hdeband/noise_static are plain text (never LFS)
-# - hdr-toys/ is plain text (never LFS) - ~300 KB total
+# LFS pointers: ArtCNN/CfL/nlmeans/ravu allowed; SSim + hdr-toys never.
 $gitattributesPath = Join-Path $Root '.gitattributes'
 if (Test-Path $gitattributesPath) {
     $ga = Get-Content $gitattributesPath -Raw
@@ -223,7 +212,7 @@ if (Test-Path $gitattributesPath) {
     else { Pass '.gitattributes keeps hdr-toys plain text (not LFS)' }
 } else { Fail 'missing path: .gitattributes' }
 
-# Top-level shader LFS pointer refinement
+# Top-level LFS check
 $allowedLfsNames = @('ArtCNN_C4F32.glsl', 'ArtCNN_C4F16.glsl', 'ArtCNN_C4F16_DN.glsl', 'ArtCNN_C4F32_DN.glsl', 'CfL_Prediction.glsl', 'nlmeans.glsl', 'ravu-zoom-ar-r4.hook')
 $lfsPointers = @()
 $ssimPointerNames = @()
@@ -236,7 +225,6 @@ Get-ChildItem (Join-Path $Root 'portable_config/shaders') -File -ErrorAction Sil
 if ($ssimPointerNames.Count -gt 0) {
     Fail "SSim shader(s) are LFS pointers but must be plain text: $($ssimPointerNames -join ', ')"
 } else {
-    # Verify SSim files exist and are plain (size check, not pointer)
     $ssimFiles = @('SSimSuperRes.glsl', 'SSimDownscaler.glsl')
     $allPlain = $true
     foreach ($sf in $ssimFiles) {
@@ -274,8 +262,7 @@ if (Test-Path $hdrToysDir) {
     } else { Pass 'hdr-toys shaders are plain text (not LFS)' }
 } else { Fail 'missing path: portable_config/shaders/hdr-toys' }
 
-# Startup smoke test. Use temporary cache/watch-later locations and a temp log so
-# this audit cannot modify generated repository state.
+# Startup smoke test (temp cache/log, never touches repo state)
 if (-not (Test-Path $Mpv)) {
     Warn 'mpv.com/mpv.exe not found; startup smoke test skipped'
 } else {
@@ -306,9 +293,7 @@ if (-not (Test-Path $Mpv)) {
             } else {
                 Pass 'mpv idle startup completed within bounded timeout'
             }
-            # Match only mpv records whose severity field is error or fatal. Do not
-            # search arbitrary log text: verbose build configuration can contain
-            # compiler flags such as -Wno-error=int-conversion.
+            # Only [e]/[fatal] severity records count - not verbose flag text.
             $bad = @($log -split "`r?`n" | Where-Object {
                 $_ -match '(?i)^\s*\[[^\r\n\]]+\]\[(?:e|fatal)\]\[[^\r\n\]]+\]\s+'
             })
@@ -323,14 +308,13 @@ if (-not (Test-Path $Mpv)) {
     }
 }
 
-# Validate that relocation-sensitive paths are derived from the active config root or kept portable.
+# Portable paths: updater keeps ~~, helper derives from config-dir.
 $refreshScript = Get-Content (Join-Path $Root 'portable_config/scripts/display/change-refresh.lua') -Raw
 $probeConfigDir = Join-Path $env:TEMP 'mpv-audit-portable_config'
 $probePath = Join-Path $probeConfigDir 'shaders\hdr-toys'
 $normalizedProbe = $probePath -replace '\\', '/'
 $hasJedypodTransform = $updater -match 'bottosson.*jedypod'
 $hasNoHardcodedMpv = ($updater -notmatch 'C:/mpv') -and ($updater -notmatch 'C:\\mpv')
-# hdr-toys.conf should now keep portable ~~ paths (verified via config include test), not absolute C:/mpv rewrite
 $hdrToysConf = Get-Content (Join-Path $Root 'portable_config/hdr-toys.conf') -Raw
 $hdrUsesPortable = $hdrToysConf -match '~~/shaders/hdr-toys'
 if ($hasJedypodTransform -and $hasNoHardcodedMpv -and $hdrUsesPortable -and ($normalizedProbe -eq (($probeConfigDir + '\shaders\hdr-toys') -replace '\\', '/'))) {

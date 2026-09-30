@@ -1,8 +1,5 @@
-# Set-RefreshRate.ps1 — changes a display's resolution/refresh rate via the real Win32
-# ChangeDisplaySettingsEx API (user32.dll), called directly through PowerShell's Add-Type.
-# No third-party tools, no downloads — everything here ships with Windows already.
-#
-# Usage: powershell -NoProfile -ExecutionPolicy Bypass -File Set-RefreshRate.ps1 -Width 1920 -Height 1080 -Rate 24 -DeviceName '\\.\DISPLAY1'
+# Set-RefreshRate.ps1 - set resolution/refresh via Win32 ChangeDisplaySettingsEx. No external tools.
+# Usage: Set-RefreshRate.ps1 -Width 1920 -Height 1080 -Rate 24 -DeviceName '\\.\DISPLAY1'
 
 param(
     [Parameter(Mandatory=$true)][int]$Width,
@@ -38,12 +35,7 @@ public class DisplayHelper {
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
         public string dmFormName;
         public short dmLogPixels;
-        // NOTE: no padding field here. Offset 104 (right after dmLogPixels) is already a multiple
-        // of 4, so dmBitsPerPel needs to start immediately. An earlier version of this script
-        // inserted a 2-byte "alignment" field here that was never actually needed -- it silently
-        // shifted every field below by 2 bytes and caused ChangeDisplaySettingsEx to reject an
-        // already-valid mode (DISP_CHANGE_BADMODE, -2). Verified by hand-computing every offset
-        // against the real struct before re-shipping this.
+        // No padding here: offset 104 is already 4-aligned, so dmBitsPerPel starts immediately.
         public int dmBitsPerPel;
         public int dmPelsWidth;
         public int dmPelsHeight;
@@ -76,11 +68,10 @@ $DM_PELSWIDTH = 0x00080000
 $DM_PELSHEIGHT = 0x00100000
 $DM_DISPLAYFREQUENCY = 0x00400000
 
-# Hard check: the real ANSI DEVMODE is exactly 156 bytes. If this struct definition ever drifts
-# again, fail here with a clear message instead of a cryptic BADMODE three steps later.
+# DEVMODE must be exactly 156 bytes - else the mode request corrupts to BADMODE.
 $structSize = [System.Runtime.InteropServices.Marshal]::SizeOf([type]"DisplayHelper+DEVMODE")
 if ($structSize -ne 156) {
-    Write-Error "DEVMODE struct is $structSize bytes, expected exactly 156. Field layout has drifted -- do not proceed, this will silently corrupt the mode request."
+    Write-Error "DEVMODE struct is $structSize bytes, expected exactly 156."
     exit 1
 }
 
@@ -96,7 +87,7 @@ try {
 
 if ($readOk -eq 0) {
     $err = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
-    Write-Error "Could not read current settings for '$DeviceName' (Win32 error code: $err). Check the device name is exact, e.g. '\\.\DISPLAY1'."
+    Write-Error "Could not read current settings for '$DeviceName' (Win32 error: $err)."
     exit 1
 }
 
